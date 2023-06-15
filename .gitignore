@@ -161,3 +161,7 @@ cython_debug/
 
 
 /data/
+*.out
+*.so
+*.vcd
+*.o
