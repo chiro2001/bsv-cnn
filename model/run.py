@@ -1,9 +1,10 @@
 import torch
 import torch.nn.functional as F
 from torchsummary import summary
+import random
+
 from data_helper import *
 from config import *
-
 from fc import FcNet
 from cnn import CNNNet
 
@@ -49,7 +50,15 @@ def fix2float(fix_num: int, decimal_bit: int) -> float:
   float_num = fix_num * 1.0 / (2 ** decimal_bit)
   return float_num
 
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True  # cudnn
+    np.random.seed(seed)  # numpy
+    random.seed(seed)  # random and transforms
+
 def run_model(model):
+  set_seed(RANDOM_SEED)
   summary(model, (1, 28, 28))
   for epoch in range(epochs):
     train(model, device, get_optimizer(model), epoch)
@@ -91,5 +100,5 @@ def test_floats():
   print(num * num2, f, fl * fl2)
 
 if __name__ == '__main__':
-  # fc()
+  fc()
   cnn()
