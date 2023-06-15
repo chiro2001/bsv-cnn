@@ -46,21 +46,21 @@ def run_model(model):
   for epoch in range(epochs):
     train(model, device, get_optimizer(model), epoch)
     test(model, device)
+  data = model.state_dict()
+  for k in data:
+    save_path = DATA_PATH + "/" + model.name + '-' + k + ".bin"
+    array = data[k].numpy()
+    array.astype(np.float32).tofile(save_path)
+    print(model.name, k, data[k].shape, save_path)
 
 def fc():
   model = FcNet().to(device).to(torch.float32)
   run_model(model)
-  data = model.state_dict()
-  for k in data:
-    print(model.name, k, data[k].shape)
-    save_path = DATA_PATH + "/" + model.name + '-' + k + ".bin"
-    array = data[k].numpy()
-    array.astype(np.float32).tofile(save_path)
 
 def cnn():
   model = CNNNet().to(device)
   run_model(model)
 
 if __name__ == '__main__':
-  fc()
-  # cnn()
+  # fc()
+  cnn()
