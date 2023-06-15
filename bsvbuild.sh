@@ -7,7 +7,12 @@
 #     sh bsvbuild.sh
 #
 
-CUSTOMBSV="-p +:`pwd`/bluelib/src"
+if [[ -z "$ROOT" ]]; then
+  ROOT=`pwd`
+fi
+
+# CUSTOMBSV="-p +:$ROOT/bluelib/src"
+CUSTOMBSV=""
 
 alias echo="echo -e"
 
@@ -150,16 +155,16 @@ while : ; do
         echo ""
 
         # compile BSV to objects
-        echo $note_color$compiler_name -sim -g $top_module -u $top_file $default_color
-        $compiler_name -sim -g $top_module -u $top_file
+        echo $note_color$compiler_name $CUSTOMBSV -sim -g $top_module -u $top_file $default_color
+        $compiler_name $CUSTOMBSV -sim -g $top_module -u $top_file
         if [ $? -ne 0 ]; then
             echo $error_color"Error: failed to compile!"$default_color
             break
         fi
         
         # link objects into a Bluespec simulation executable file
-        echo $note_color$compiler_name -sim -e $top_module -o $sim_exe_file $CUSTOMBSV $default_color
-        $compiler_name -sim -e $top_module -o $sim_exe_file $CUSTOMBSV
+        echo $note_color$compiler_name $CUSTOMBSV -sim -e $top_module -o $sim_exe_file $default_color
+        $compiler_name $CUSTOMBSV -sim -e $top_module -o $sim_exe_file
         if [ $? -ne 0 ]; then
             echo $error_color"Error: failed to link!"$default_color
             break
@@ -193,8 +198,8 @@ while : ; do
     elif [ $param = '-v' ] || [ $param = '-vs' ] || [ $param = '-vw' ] || [ $param = '-vsw' ]; then   # use Verilog as simulation engine ------------------------------------------------------------------------------------------------------------------
 
         # compile BSV to Verilog
-        echo $note_color$compiler_name -verilog -g $top_module -u $top_file $CUSTOMBSV $default_color
-        $compiler_name -verilog -g $top_module -u $top_file $CUSTOMBSV
+        echo $note_color$compiler_name $CUSTOMBSV -verilog -g $top_module -u $top_file $default_color
+        $compiler_name $CUSTOMBSV -verilog -g $top_module -u $top_file
         if [ $? -ne 0 ]; then
             echo $error_color"Error: failed to generate Verilog !"$default_color
             break
