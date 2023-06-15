@@ -55,21 +55,26 @@ def run_model(model):
     train(model, device, get_optimizer(model), epoch)
     test(model, device)
   data = model.state_dict()
+  data_new = {}
   for k in data:
     save_path = DATA_PATH + model.name + '-' + k + ".bin"
     array = data[k].numpy()
     array.astype(np.float32).tofile(save_path)
     save_path_int8 = DATA_PATH + model.name + '-' + k + ".int8"
-    array_int8 = np.array([float2fix(x, 8) for x in array.flatten()])
-    array_int8.astype(np.int8).tofile(save_path_int8)
+    array_int8 = np.array([float2fix(x, 6) for x in array.flatten()]).astype(np.int8)
+    array_int8.tofile(save_path_int8)
     print(model.name, k, data[k].shape, "max", array.max(), "min", array.min(), "int8 max", array_int8.max(), "int8 min", array_int8.min(), save_path)
+    array_restore = np.array([fix2float(x, 6) for x in array_int8.flatten()]).astype(np.float32).reshape(array.shape)
+    data_new[k] = torch.from_numpy(array_restore)
+  model.load_state_dict(data_new)
+  test(model, device)
 
 def fc():
   model = FcNet().to(device).to(torch.float32)
   run_model(model)
 
 def cnn():
-  model = CNNNet().to(device).to(torch.float32)
+  model = CNNNet().to(device)
   run_model(model)
 
 def test_floats():
@@ -86,5 +91,5 @@ def test_floats():
   print(num * num2, f, fl * fl2)
 
 if __name__ == '__main__':
-  fc()
-  # cnn()
+  # fc()
+  cnn()
