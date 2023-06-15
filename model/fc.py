@@ -5,6 +5,7 @@ import torch.nn.functional as F
 class FcNet(nn.Module):
   def __init__(self) -> None:
     super().__init__()
+    self.name = "fc"
     self.fc1 = nn.Linear(784, 128)
     self.fc2 = nn.Linear(128, 10)
 

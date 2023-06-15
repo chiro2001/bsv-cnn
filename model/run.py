@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-import torch.optim as optim
+from torchsummary import summary
 from data_helper import *
 from config import *
 
@@ -42,18 +42,25 @@ def test(model, device):
 
 
 def run_model(model):
+  summary(model, (1, 28, 28))
   for epoch in range(epochs):
     train(model, device, get_optimizer(model), epoch)
     test(model, device)
 
 def fc():
-  model = FcNet().to(device)
+  model = FcNet().to(device).to(torch.float32)
   run_model(model)
+  data = model.state_dict()
+  for k in data:
+    print(model.name, k, data[k].shape)
+    save_path = DATA_PATH + "/" + model.name + '-' + k + ".bin"
+    array = data[k].numpy()
+    array.astype(np.float32).tofile(save_path)
 
 def cnn():
   model = CNNNet().to(device)
   run_model(model)
 
 if __name__ == '__main__':
-  # fc()
-  cnn()
+  fc()
+  # cnn()
