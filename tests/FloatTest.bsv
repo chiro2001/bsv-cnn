@@ -1,4 +1,4 @@
-// import Float32::*;
+import Float32::*;
 
 module mkTb();
 

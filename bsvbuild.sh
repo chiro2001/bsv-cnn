@@ -7,6 +7,8 @@
 #     sh bsvbuild.sh
 #
 
+CUSTOMBSV="-p +:`pwd`/bluelib/src"
+
 alias echo="echo -e"
 
 # colors for print text ------------------------------------------------------------------------------------------------------------------
@@ -156,8 +158,8 @@ while : ; do
         fi
         
         # link objects into a Bluespec simulation executable file
-        echo $note_color$compiler_name -sim -e $top_module -o $sim_exe_file $default_color
-        $compiler_name -sim -e $top_module -o $sim_exe_file
+        echo $note_color$compiler_name -sim -e $top_module -o $sim_exe_file $CUSTOMBSV $default_color
+        $compiler_name -sim -e $top_module -o $sim_exe_file $CUSTOMBSV
         if [ $? -ne 0 ]; then
             echo $error_color"Error: failed to link!"$default_color
             break
@@ -191,8 +193,8 @@ while : ; do
     elif [ $param = '-v' ] || [ $param = '-vs' ] || [ $param = '-vw' ] || [ $param = '-vsw' ]; then   # use Verilog as simulation engine ------------------------------------------------------------------------------------------------------------------
 
         # compile BSV to Verilog
-        echo $note_color$compiler_name -verilog -g $top_module -u $top_file $default_color
-        $compiler_name -verilog -g $top_module -u $top_file
+        echo $note_color$compiler_name -verilog -g $top_module -u $top_file $CUSTOMBSV $default_color
+        $compiler_name -verilog -g $top_module -u $top_file $CUSTOMBSV
         if [ $? -ne 0 ]; then
             echo $error_color"Error: failed to generate Verilog !"$default_color
             break
