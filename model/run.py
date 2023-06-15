@@ -41,22 +41,11 @@ def test(model, device):
     100. * correct / len(test_loader.dataset)))
 
 # 浮点数转换为定点数
-def float2fix(float_num: float, decimal_bit: int, fix_bit: int) -> int:
-  # float_num 输入浮点数
-  # decimal_bit 小数位位数
-  # fix_bit 定点数位数
-  # fix_num = (2 ** fix_bit + np.round(float_num * (2 ** decimal_bit))) % (2 ** fix_bit)
-  # fix_num = 2 ** fix_bit + np.round(float_num * (2 ** decimal_bit))
-  # fix_num - 2 ** fix_bit = float_num * (2 ** decimal_bit)
-  # fix_num / (2 ** decimal_bit) - 2 ** (fix_bit - decimal_bit) = float_num
+def float2fix(float_num: float, decimal_bit: int) -> int:
   fix_num = int(float_num * (2 ** decimal_bit))
   return fix_num
 
-def fix2float(fix_num: int, decimal_bit: int, fix_bit: int) -> float:
-  # fix_num 输入定点数
-  # decimal_bit 小数位位数
-  # fix_bit 定点数位数
-  # float_num = fix_num / (2 ** decimal_bit) - 2 ** (fix_bit - decimal_bit)
+def fix2float(fix_num: int, decimal_bit: int) -> float:
   float_num = fix_num * 1.0 / (2 ** decimal_bit)
   return float_num
 
@@ -71,7 +60,7 @@ def run_model(model):
     array = data[k].numpy()
     array.astype(np.float32).tofile(save_path)
     save_path_int8 = DATA_PATH + model.name + '-' + k + ".int8"
-    array_int8 = np.array([float2fix(x, 8, 6) for x in array.flatten()])
+    array_int8 = np.array([float2fix(x, 8) for x in array.flatten()])
     array_int8.astype(np.int8).tofile(save_path_int8)
     print(model.name, k, data[k].shape, "max", array.max(), "min", array.min(), "int8 max", array_int8.max(), "int8 min", array_int8.min(), save_path)
 
@@ -83,11 +72,19 @@ def cnn():
   model = CNNNet().to(device).to(torch.float32)
   run_model(model)
 
-if __name__ == '__main__':
-  num = -89
+def test_floats():
+  num = 127.2133241
+  num2 = -2.3
   decimal_bit: int = 8
-  fix_bit: int = 3
-  fix = float2fix(num, decimal_bit, fix_bit)
-  print(num, fix, fix2float(fix, decimal_bit, fix_bit))
+  fix = float2fix(num, decimal_bit)
+  fix2 = float2fix(num2, decimal_bit)
+  fl = fix2float(fix, decimal_bit)
+  fl2 = fix2float(fix2, decimal_bit)
+  f = fix2float(fix * fix2, decimal_bit * 2)
+  print(num, fix, fl)
+  print(num2, fix, fl2)
+  print(num * num2, f, fl * fl2)
+
+if __name__ == '__main__':
   fc()
   # cnn()
