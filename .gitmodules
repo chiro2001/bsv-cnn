@@ -1,0 +1,3 @@
+[submodule "bluelib"]
+	path = bluelib
+	url = https://github.com/chiro2001/bluelib
