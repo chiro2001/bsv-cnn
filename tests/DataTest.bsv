@@ -14,7 +14,7 @@ module mkTb();
 
   String test_bias_data_file = "../data/fc-fc1.bias.int8";
   BRAM1Port#(Bit#(10), Bit#(8)) test_bias_data <- mkBRAM1Server(BRAM_Configure{
-    memorySize: 128, 
+    memorySize: 32, 
     latency: 1, 
     outFIFODepth: 3, 
     allowWriteResponseBypass:False, 
@@ -22,7 +22,7 @@ module mkTb();
   });
 
   String test_weight_path = "../data/fc-fc1.weight/";
-  Vector#(128, BRAM1Port#(Bit#(10), Bit#(8))) weights;
+  Vector#(32, BRAM1Port#(Bit#(10), Bit#(8))) weights;
   Vector#(10, String) digitals;
   digitals[0] = "0";
   digitals[1] = "1";
@@ -34,7 +34,7 @@ module mkTb();
   digitals[7] = "7";
   digitals[8] = "8";
   digitals[9] = "9";
-  for (Integer i = 0; i < 128; i = i + 1) begin
+  for (Integer i = 0; i < 32; i = i + 1) begin
     Integer ii = i;
     String path_num = "";
     for (Integer j = 0; j < 3; j = j + 1) begin
@@ -47,7 +47,7 @@ module mkTb();
     if (path_num == "") path_num = "0";
     let path = test_weight_path + path_num;
     weights[i] <- mkBRAM1Server(BRAM_Configure{
-      memorySize: 128, 
+      memorySize: 32, 
       latency: 1, 
       outFIFODepth: 3, 
       allowWriteResponseBypass:False, 
@@ -62,7 +62,7 @@ module mkTb();
       address: cnt, 
       datain: 0
     });
-    for (Integer i = 0; i < 128; i = i + 1) begin
+    for (Integer i = 0; i < 32; i = i + 1) begin
       weights[i].portA.request.put(BRAMRequest{
         write: False, 
         responseOnWrite: False, 
@@ -75,9 +75,9 @@ module mkTb();
   rule test_read_bias;
     Bit#(8) bdata <- test_bias_data.portA.response.get();
     $display("bias = %d", bdata);
-    for (Integer i = 0; i < 128; i = i + 1) begin
+    for (Integer i = 0; i < 32; i = i + 1) begin
       Bit#(8) wdata <- weights[i].portA.response.get();
-      $write("%d", wdata);
+      $write("%d ", wdata);
     end
     $display("");
   endrule

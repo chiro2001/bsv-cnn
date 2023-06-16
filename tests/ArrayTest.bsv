@@ -1,4 +1,4 @@
-import fc::*;
+// import fc::*;
 import Vector::*;
 
 function Vector#(2, Int#(8)) get_test_vector();

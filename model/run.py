@@ -165,7 +165,8 @@ def run_model(model):
   for epoch in range(epochs):
     train(model, device, get_optimizer(model), epoch)
     test(model, device)
-  dump_bsv(model)
+  # dump_bsv(model)
+  dump_binary_hex(model)
 
 def fc():
   model = FcNet().to(device).to(torch.float32)
