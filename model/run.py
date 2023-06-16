@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torchsummary import summary
 import random
+import os
 
 from data_helper import *
 from config import *
@@ -51,11 +52,16 @@ def fix2float(fix_num: int, decimal_bit: int) -> float:
   return float_num
 
 def set_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True  # cudnn
-    np.random.seed(seed)  # numpy
-    random.seed(seed)  # random and transforms
+  torch.manual_seed(seed)
+  torch.cuda.manual_seed(seed)
+  torch.backends.cudnn.deterministic = True  # cudnn
+  np.random.seed(seed)  # numpy
+  random.seed(seed)  # random and transforms
+
+def write_hex(data, path):
+  with open(path, "w") as f:
+    for i in range(len(data)):
+      f.write("{:02X}\n".format(data[i]))
 
 def run_model(model):
   set_seed(RANDOM_SEED)
@@ -70,11 +76,26 @@ def run_model(model):
     array = data[k].numpy()
     array.astype(np.float32).tofile(save_path)
     save_path_int8 = DATA_PATH + model.name + '-' + k + ".int8"
-    array_int8 = np.array([float2fix(x, 6) for x in array.flatten()]).astype(np.int8)
-    array_int8.tofile(save_path_int8)
-    print(model.name, k, data[k].shape, "max", array.max(), "min", array.min(), "int8 max", array_int8.max(), "int8 min", array_int8.min(), save_path)
-    array_restore = np.array([fix2float(x, 6) for x in array_int8.flatten()]).astype(np.float32).reshape(array.shape)
+    array_uint8 = np.array([float2fix(x, 6) for x in array.flatten()], dtype="uint8")
+    # array_int8.tofile(save_path_int8)
+    write_hex(array_uint8, save_path_int8)
+    print(model.name, k, data[k].shape, "max", array.max(), "min", array.min(), "int8 max", array_uint8.max(), "int8 min", array_uint8.min(), save_path)
+    array_restore = np.array([fix2float(x, 6) for x in np.array(array_uint8, dtype="int8").flatten()]).astype(np.float32).reshape(array.shape)
     data_new[k] = torch.from_numpy(array_restore)
+    if len(array.shape) >= 2:
+      # save as splited lines
+      save_path_dir = DATA_PATH + model.name + '-' + k
+      if not os.path.exists(save_path_dir):
+        os.makedirs(save_path_dir)
+      for i in range(array.shape[0]):
+        if len(array.shape) == 2:
+          a = array_uint8.reshape(array.shape)[i]
+        else:
+          a = array_uint8.reshape([*list(array.shape)[:-2], array.shape[-1] * array.shape[-2]])[i]
+        d = np.hstack(a)
+        # print(d)
+        # .tofile(save_path_dir + "/" + str(i))
+        write_hex(d, save_path_dir + "/" + str(i))
   model.load_state_dict(data_new)
   test(model, device)
 
