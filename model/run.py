@@ -63,7 +63,7 @@ def write_hex(data, path):
     for i in range(len(data)):
       f.write("{:02X}\n".format(data[i]))
 
-def dump_bsv(model):
+def dump_bsv(model, vector: bool = False):
   name = model.name.lower()
   with open(GEN_PATH + name + ".bsv", "w") as f:
     f.write(f"// generated file\npackage {name};\n\nimport Vector::*;\n\n")
@@ -74,38 +74,56 @@ def dump_bsv(model):
       data = np.array([float2fix(x, 6) for x in data.flatten()], dtype="int8").reshape(data.shape)
       f.write(f"// model {name} key {key} \n")
       
-      def write_function_header(typ: str):
-        f.write(f"function {typ} {get_layer_name(key)}();\n")
-        f.write(f"  {typ} a;\n")
-        
-      if len(data.shape) == 1:
-        typ = f"Vector#({data.shape[0]}, Int#(8))"
-        write_function_header(typ)
-        for i in range(data.shape[0]):
-          f.write(f"a[{i}]={data[i]};")
-        f.write("\n")
-        f.write(f"  return a;\n")
-        f.write(f"endfunction\n\n")
-      elif len(data.shape) == 2:
-        typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Int#(8)))"
-        write_function_header(typ)
-        for i in range(data.shape[0]):
-          for j in range(data.shape[1]):
-            f.write(f"a[{i}][{j}]={data[i][j]};")
+      def write_function_header(typ: str, typ2=None, typ3="a"):
+        typ2 = typ2 if typ2 is not None else typ
+        f.write(f"function {typ2} {get_layer_name(key)}();\n")
+        f.write(f"  {typ} {typ3};\n")
+      
+      if vector:
+        if len(data.shape) == 1:
+          typ = f"Vector#({data.shape[0]}, Int#(8))"
+          write_function_header(typ)
+          for i in range(data.shape[0]):
+            f.write(f"a[{i}]={data[i]};")
           f.write("\n")
-        f.write(f"  return a;\n")
-        f.write(f"endfunction\n\n")
-      elif len(data.shape) == 4:
-        typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, Int#(8)))))"
-        write_function_header(typ)
-        for i in range(data.shape[0]):
-          for j in range(data.shape[1]):
-            for k in range(data.shape[2]):
-              for l in range(data.shape[3]):
-                f.write(f"a[{i}][{j}][{k}][{l}]={data[i][j][k][l]};")
+        elif len(data.shape) == 2:
+          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Int#(8)))"
+          write_function_header(typ)
+          for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+              f.write(f"a[{i}][{j}]={data[i][j]};")
             f.write("\n")
-        f.write(f"  return a;\n")
-        f.write(f"endfunction\n\n")
+        elif len(data.shape) == 4:
+          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, Int#(8)))))"
+          write_function_header(typ)
+          for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+              for k in range(data.shape[2]):
+                for l in range(data.shape[3]):
+                  f.write(f"a[{i}][{j}][{k}][{l}]={data[i][j][k][l]};")
+              f.write("\n")
+      else:
+        if len(data.shape) == 1:
+          write_function_header(f"Int#(8) a[{data.shape[0]}]", "Int#(8)[]", "")
+          for i in range(data.shape[0]):
+            f.write(f"a[{i}]={data[i]};")
+          f.write("\n")
+        elif len(data.shape) == 2:
+          write_function_header(f"Int#(8) a[{data.shape[0]}][{data.shape[1]}]", "Int#(8)[][]", "")
+          for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+              f.write(f"a[{i}][{j}]={data[i][j]};")
+            f.write("\n")
+        elif len(data.shape) == 4:
+          write_function_header(f"Int#(8) a[{data.shape[0]}][{data.shape[1]}][{data.shape[2]}][{data.shape[3]}]", "Int#(8)[][][][]", "")
+          for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+              for k in range(data.shape[2]):
+                for l in range(data.shape[3]):
+                  f.write(f"a[{i}][{j}][{k}][{l}]={data[i][j][k][l]};")
+              f.write("\n")
+      f.write(f"  return a;\n")
+      f.write(f"endfunction\n\n")
     
     f.write("endpackage\n")
 
@@ -172,4 +190,4 @@ def test_floats():
 
 if __name__ == '__main__':
   fc()
-  cnn()
+  # cnn()
