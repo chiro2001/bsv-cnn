@@ -1,6 +1,7 @@
 import torch
 
 DATA_PATH = "../data/"
+GEN_PATH = "../gen/"
 RANDOM_SEED = 114514
 batch_size_train = 64
 batch_size_test = 1000

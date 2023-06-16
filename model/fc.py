@@ -6,8 +6,10 @@ class FcNet(nn.Module):
   def __init__(self) -> None:
     super().__init__()
     self.name = "fc"
-    self.fc1 = nn.Linear(784, 128)
-    self.fc2 = nn.Linear(128, 10)
+    # self.fc1 = nn.Linear(784, 128)
+    # self.fc2 = nn.Linear(128, 10)
+    self.fc1 = nn.Linear(784, 10)
+    self.fc2 = nn.Linear(10, 10)
     d = self.fc1.state_dict()
     # print(d['weight'].shape)
     # print(d['bias'].shape)

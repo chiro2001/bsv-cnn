@@ -12,7 +12,7 @@ if [[ -z "$ROOT" ]]; then
 fi
 
 # CUSTOMBSV="-p +:$ROOT/bluelib/src"
-CUSTOMBSV=""
+CUSTOMBSV="-p +:$ROOT/gen"
 
 alias echo="echo -e"
 

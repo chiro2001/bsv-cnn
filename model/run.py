@@ -63,12 +63,53 @@ def write_hex(data, path):
     for i in range(len(data)):
       f.write("{:02X}\n".format(data[i]))
 
-def run_model(model):
-  set_seed(RANDOM_SEED)
-  summary(model, (1, 28, 28))
-  for epoch in range(epochs):
-    train(model, device, get_optimizer(model), epoch)
-    test(model, device)
+def dump_bsv(model):
+  name = model.name.lower()
+  with open(GEN_PATH + name + ".bsv", "w") as f:
+    f.write(f"// generated file\npackage {name};\n\nimport Vector::*;\n\n")
+    def get_layer_name(original: str) -> str:
+      return (name + "_" + original).replace(".", "_").replace("-", "_")
+    for key in model.state_dict():
+      data = model.state_dict()[key]
+      data = np.array([float2fix(x, 6) for x in data.flatten()], dtype="int8").reshape(data.shape)
+      f.write(f"// model {name} key {key} \n")
+      
+      def write_function_header(typ: str):
+        f.write(f"function {typ} {get_layer_name(key)}();\n")
+        f.write(f"  {typ} a;\n")
+        
+      if len(data.shape) == 1:
+        typ = f"Vector#({data.shape[0]}, Int#(8))"
+        write_function_header(typ)
+        for i in range(data.shape[0]):
+          f.write(f"a[{i}]={data[i]};")
+        f.write("\n")
+        f.write(f"  return a;\n")
+        f.write(f"endfunction\n\n")
+      elif len(data.shape) == 2:
+        typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Int#(8)))"
+        write_function_header(typ)
+        for i in range(data.shape[0]):
+          for j in range(data.shape[1]):
+            f.write(f"a[{i}][{j}]={data[i][j]};")
+          f.write("\n")
+        f.write(f"  return a;\n")
+        f.write(f"endfunction\n\n")
+      elif len(data.shape) == 4:
+        typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, Int#(8)))))"
+        write_function_header(typ)
+        for i in range(data.shape[0]):
+          for j in range(data.shape[1]):
+            for k in range(data.shape[2]):
+              for l in range(data.shape[3]):
+                f.write(f"a[{i}][{j}][{k}][{l}]={data[i][j][k][l]};")
+            f.write("\n")
+        f.write(f"  return a;\n")
+        f.write(f"endfunction\n\n")
+    
+    f.write("endpackage\n")
+
+def dump_binary_hex(model):
   data = model.state_dict()
   data_new = {}
   for k in data:
@@ -98,6 +139,15 @@ def run_model(model):
         write_hex(d, save_path_dir + "/" + str(i))
   model.load_state_dict(data_new)
   test(model, device)
+        
+
+def run_model(model):
+  set_seed(RANDOM_SEED)
+  summary(model, (1, 28, 28))
+  for epoch in range(epochs):
+    train(model, device, get_optimizer(model), epoch)
+    test(model, device)
+  dump_bsv(model)
 
 def fc():
   model = FcNet().to(device).to(torch.float32)
