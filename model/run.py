@@ -185,10 +185,12 @@ def test_floats():
   fl = fix2float(fix, decimal_bit)
   fl2 = fix2float(fix2, decimal_bit)
   f = fix2float(fix * fix2, decimal_bit * 2)
+  f2 = fix2float((fix * fix2) >> decimal_bit, decimal_bit)
   print(num, fix, fl)
   print(num2, fix, fl2)
-  print(num * num2, f, fl * fl2)
+  print(num * num2, f, f2, fl * fl2)
 
 if __name__ == '__main__':
+  # test_floats()
   fc()
-  # cnn()
+  cnn()

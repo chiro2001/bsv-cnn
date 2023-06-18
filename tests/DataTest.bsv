@@ -47,7 +47,7 @@ module mkTb();
     if (path_num == "") path_num = "0";
     let path = test_weight_path + path_num;
     weights[i] <- mkBRAM1Server(BRAM_Configure{
-      memorySize: 32, 
+      memorySize: 784, 
       latency: 1, 
       outFIFODepth: 3, 
       allowWriteResponseBypass:False, 
@@ -77,7 +77,8 @@ module mkTb();
     $display("bias = %d", bdata);
     for (Integer i = 0; i < 32; i = i + 1) begin
       Bit#(8) wdata <- weights[i].portA.response.get();
-      $write("%d ", wdata);
+      Int#(8) d = unpack(wdata);
+      $write("%d ", d);
     end
     $display("");
   endrule
