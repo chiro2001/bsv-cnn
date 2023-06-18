@@ -6,19 +6,24 @@ interface LayerData_ifc#(type td, type lines, type depth);
   method Vector#(lines, ActionValue#(td)) getWeight();
   method ActionValue#(td) getBias();
   method Action resetState();
-  method Bit#(TLog#(depth)) getIndex();
+  method Bit#(TAdd#(TLog#(depth), 1)) getIndex();
+  method Bit#(TAdd#(TLog#(lines), 1)) getIndexLines();
 endinterface
 
 module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth))
     provisos (
       Bits#(td, sz), 
       Literal#(td), 
-      Add#(TLog#(lines), v__, depth_log), 
-      Log#(depth, depth_log)
+      Log#(depth, depth_log),
+      Log#(lines, lines_log)
     );
-  Reg#(Bit#(depth_log)) index <- mkReg(0);
-  Wire#(Bit#(depth_log)) addr <- mkDWire(0);
-  Vector#(lines, BRAM1Port#(Bit#(depth_log), td)) weights;
+  Reg#(Bit#(TAdd#(depth_log, 1))) index <- mkReg(0);
+  Wire#(Bit#(TAdd#(depth_log, 1))) addr <- mkDWire(0);
+  // Wire#(Bit#(depth_log)) index_next <- mkDWire(0);
+  Vector#(lines, BRAM1Port#(Bit#(TAdd#(depth_log, 1)), td)) weights;
+  Reg#(Bit#(TAdd#(lines_log, 1))) index_bias <- mkReg(0);
+  Wire#(Bit#(TAdd#(lines_log, 1))) addr_bias <- mkDWire(0);
+  // Wire#(Bit#(lines_log)) index_bias_next <- mkDWire(0);
 
   String weights_path = "data/fc-" + layer_name + ".weight/";
   for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
@@ -33,7 +38,7 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
   end
 
   String bias_path = "data/fc-" + layer_name + ".bias.int8";
-  BRAM1Port#(Bit#(TLog#(lines)), td) bias <- mkBRAM1Server(BRAM_Configure{
+  BRAM1Port#(Bit#(TAdd#(lines_log, 1)), td) bias <- mkBRAM1Server(BRAM_Configure{
       memorySize: valueOf(lines), 
       latency: 1, 
       outFIFODepth: 3, 
@@ -44,6 +49,7 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
   // default value?
   rule set_addr /*(index != 'haaaaaaaa)*/;
     addr <= index;
+    addr_bias <= index_bias;
   endrule
 
   rule read;
@@ -55,18 +61,21 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
         datain: 0
       });
     end
-    // if (addr < fromInteger(valueOf(lines))) begin
     bias.portA.request.put(BRAMRequest{
       write: False, 
       responseOnWrite: False, 
-      address: truncate(addr), 
+      address: addr_bias, 
       datain: 0
     });
-    // end
   endrule
 
   rule inc_index;
-    index <= (index == (fromInteger(valueOf(depth)) - 1) ? 0 : (index + 1));
+    let index_max = fromInteger(valueOf(depth) - 1);
+    let index_next = (addr == index_max ? index_max : (addr + 1));
+    index <= index_next;
+    let index_bias_max = fromInteger(valueOf(lines) - 1);
+    let index_bias_next = (index_bias == index_bias_max ? index_bias_max : (index_bias + 1));
+    index_bias <= index_bias_next;
   endrule
 
   function ActionValue#(td) getWeightValue(Integer i);
@@ -81,8 +90,10 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
 
   method Action resetState();
     index <= 0;
+    index_bias <= 0;
   endmethod
 
   method getIndex = index;
+  method getIndexLines = index_bias;
 
 endmodule
