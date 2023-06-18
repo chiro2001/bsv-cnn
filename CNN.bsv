@@ -1,9 +1,11 @@
+import Vector::*;
 import Utils::*;
 import Data::*;
+import Layers::*;
 
 module mkTb();
 
-LayerData_ifc fc1 <- mkLayerData(32, 28 * 28, "fc1");
+Layer#(Vector#(784, Int#(8)), Vector#(32, Int#(8))) fc1 <- mkFCLayer("fc1");
 
 rule hello;
   $display("Hello World!");
