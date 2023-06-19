@@ -22,9 +22,9 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
       Log#(depth, depth_log),
       Log#(lines, lines_log)
     );
-  Reg#(Bit#(TAdd#(depth_log, 1))) index <- mkReg(fromInteger(valueOf(depth)));
+  Reg#(Bit#(TAdd#(depth_log, 1))) index <- mkReg(fromInteger(valueOf(depth) + 1));
   Vector#(lines, BRAM1Port#(Bit#(TAdd#(depth_log, 1)), td)) weights;
-  Reg#(Bit#(TAdd#(lines_log, 1))) index_bias <- mkReg(fromInteger(valueOf(lines)));
+  Reg#(Bit#(TAdd#(lines_log, 1))) index_bias <- mkReg(fromInteger(valueOf(lines) + 1));
 
   let weightsDoneBool = index >= fromInteger(valueOf(depth) + 1);
   let weightsWillDoneBool = index >= fromInteger(valueOf(depth));
