@@ -17,12 +17,12 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
       Log#(depth, depth_log),
       Log#(lines, lines_log)
     );
-  Reg#(Bit#(TAdd#(depth_log, 1))) index <- mkReg(0);
-  Wire#(Bit#(TAdd#(depth_log, 1))) addr <- mkDWire(0);
+  Reg#(Bit#(TAdd#(depth_log, 1))) index <- mkReg(fromInteger(valueOf(depth)));
+  // Wire#(Bit#(TAdd#(depth_log, 1))) addr <- mkDWire(0);
   // Wire#(Bit#(depth_log)) index_next <- mkDWire(0);
   Vector#(lines, BRAM1Port#(Bit#(TAdd#(depth_log, 1)), td)) weights;
-  Reg#(Bit#(TAdd#(lines_log, 1))) index_bias <- mkReg(0);
-  Wire#(Bit#(TAdd#(lines_log, 1))) addr_bias <- mkDWire(0);
+  Reg#(Bit#(TAdd#(lines_log, 1))) index_bias <- mkReg(fromInteger(valueOf(lines)));
+  // Wire#(Bit#(TAdd#(lines_log, 1))) addr_bias <- mkDWire(0);
   // Wire#(Bit#(lines_log)) index_bias_next <- mkDWire(0);
 
   String weights_path = "data/fc-" + layer_name + ".weight/";
@@ -46,36 +46,47 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
       loadFormat: tagged Hex bias_path
     });
 
-  // default value?
-  rule set_addr /*(index != 'haaaaaaaa)*/;
-    addr <= index;
-    addr_bias <= index_bias;
-  endrule
+  // // default value?
+  // rule set_addr /*(index != 'haaaaaaaa)*/;
+  //   addr <= index;
+  //   addr_bias <= index_bias;
+  // endrule
 
-  rule read;
+  rule read_weights (index < fromInteger(valueOf(depth)));
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       weights[i].portA.request.put(BRAMRequest{
         write: False, 
         responseOnWrite: False, 
-        address: addr, 
+        address: index, 
         datain: 0
       });
     end
+  endrule
+
+  rule read_bias (index_bias < fromInteger(valueOf(lines)));
     bias.portA.request.put(BRAMRequest{
       write: False, 
       responseOnWrite: False, 
-      address: addr_bias, 
+      address: index_bias, 
       datain: 0
     });
   endrule
 
-  rule inc_index;
-    let index_max = fromInteger(valueOf(depth) - 1);
-    let index_next = (addr == index_max ? index_max : (addr + 1));
-    index <= index_next;
-    let index_bias_max = fromInteger(valueOf(lines) - 1);
-    let index_bias_next = (index_bias == index_bias_max ? index_bias_max : (index_bias + 1));
-    index_bias <= index_bias_next;
+  // rule inc_index;
+  //   let index_max = fromInteger(valueOf(depth) - 1);
+  //   let index_next = (addr == index_max ? index_max : (addr + 1));
+  //   index <= index_next;
+  //   let index_bias_max = fromInteger(valueOf(lines) - 1);
+  //   let index_bias_next = (index_bias == index_bias_max ? index_bias_max : (index_bias + 1));
+  //   index_bias <= index_bias_next;
+  // endrule
+
+  rule inc_index (index < fromInteger(valueOf(depth)));
+    index <= index + 1;
+  endrule
+
+  rule inc_index_bias (index_bias < fromInteger(valueOf(lines)));
+    index_bias <= index_bias + 1;
   endrule
 
   function ActionValue#(td) getWeightValue(Integer i);

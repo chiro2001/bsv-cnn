@@ -22,7 +22,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   FIFO#(in) fifo_in <- mkLFIFO;
   FIFO#(out) fifo_out <- mkLFIFO;
 
-  rule start if (!stage && data.getIndex() == 0);
+  rule start (!stage && data.getIndex() == fromInteger(valueOf(depth)) && data.getIndexLines() == fromInteger(valueOf(lines)));
     fifo_in.deq;
     data.resetState();
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
@@ -30,7 +30,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     end
   endrule
 
-  rule acc_weights if (!stage && data.getIndex() < fromInteger(valueOf(depth)));
+  rule acc_weights (!stage && data.getIndex() < fromInteger(valueOf(depth)));
     let weight = data.getWeight();
     let top = fifo_in.first;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
@@ -41,7 +41,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
       stage <= True;
   endrule
 
-  rule acc_bias if (stage && data.getIndexLines() < fromInteger(valueOf(lines)));
+  rule acc_bias (stage && data.getIndexLines() < fromInteger(valueOf(lines)));
     if (data.getIndexLines() == fromInteger(valueOf(lines) - 1))
       stage <= False;
   endrule
