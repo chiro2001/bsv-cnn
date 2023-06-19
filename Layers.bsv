@@ -22,28 +22,29 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   FIFO#(in) fifo_in <- mkLFIFO;
   FIFO#(out) fifo_out <- mkLFIFO;
 
-  rule start (!stage && data.getIndex() == fromInteger(valueOf(depth)) && data.getIndexLines() == fromInteger(valueOf(lines)));
-    fifo_in.deq;
+  Reg#(in) data_in <- mkReg(unpack('0));
+
+  rule start (!stage && data.weightsDone() && data.biasDone());
+    data_in <= fifo_in.first;
     data.resetState();
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       tmp[i] <= 0;
     end
   endrule
 
-  rule acc_weights (!stage && data.getIndex() < fromInteger(valueOf(depth)));
+  rule acc_weights (!stage && !data.weightsDone());
     let weight = data.getWeight();
-    let top = fifo_in.first;
+    let top = data_in;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       let w <- weight[i];
-      tmp[i] <= tmp[i] + (top[i] * w) >> 6;
+      let mul = top[i] * w;
+      tmp[i] <= tmp[i] + mul >> 6;
     end
-    if (data.getIndex() == fromInteger(valueOf(depth) - 1))
-      stage <= True;
+    if (data.weightsWillDone()) stage <= True;
   endrule
 
-  rule acc_bias (stage && data.getIndexLines() < fromInteger(valueOf(lines)));
-    if (data.getIndexLines() == fromInteger(valueOf(lines) - 1))
-      stage <= False;
+  rule acc_bias (stage && !data.biasDone());
+    if (data.biasWillDone()) stage <= False;
   endrule
 
   method Action put(in x);

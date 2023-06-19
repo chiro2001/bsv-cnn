@@ -8,6 +8,10 @@ interface LayerData_ifc#(type td, type lines, type depth);
   method Action resetState();
   method Bit#(TAdd#(TLog#(depth), 1)) getIndex();
   method Bit#(TAdd#(TLog#(lines), 1)) getIndexLines();
+  method Bool weightsDone();
+  method Bool biasDone();
+  method Bool weightsWillDone();
+  method Bool biasWillDone();
 endinterface
 
 module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth))
@@ -24,6 +28,9 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
   Reg#(Bit#(TAdd#(lines_log, 1))) index_bias <- mkReg(fromInteger(valueOf(lines)));
   // Wire#(Bit#(TAdd#(lines_log, 1))) addr_bias <- mkDWire(0);
   // Wire#(Bit#(lines_log)) index_bias_next <- mkDWire(0);
+
+  let weightsDoneBool = index >= fromInteger(valueOf(depth));
+  let biasDoneBool = index_bias >= fromInteger(valueOf(lines));
 
   String weights_path = "data/fc-" + layer_name + ".weight/";
   for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
@@ -52,7 +59,7 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
   //   addr_bias <= index_bias;
   // endrule
 
-  rule read_weights (index < fromInteger(valueOf(depth)));
+  rule read_weights (!weightsDoneBool);
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       weights[i].portA.request.put(BRAMRequest{
         write: False, 
@@ -63,7 +70,7 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
     end
   endrule
 
-  rule read_bias (index_bias < fromInteger(valueOf(lines)));
+  rule read_bias (!biasDoneBool);
     bias.portA.request.put(BRAMRequest{
       write: False, 
       responseOnWrite: False, 
@@ -81,11 +88,11 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
   //   index_bias <= index_bias_next;
   // endrule
 
-  rule inc_index (index < fromInteger(valueOf(depth)));
+  rule inc_index (!weightsDoneBool);
     index <= index + 1;
   endrule
 
-  rule inc_index_bias (index_bias < fromInteger(valueOf(lines)));
+  rule inc_index_bias (!biasDoneBool);
     index_bias <= index_bias + 1;
   endrule
 
@@ -106,5 +113,10 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
 
   method getIndex = index;
   method getIndexLines = index_bias;
+
+  method Bool weightsDone() = weightsDoneBool;
+  method Bool biasDone() = biasDoneBool;
+  method Bool weightsWillDone() = index + 1 >= fromInteger(valueOf(depth));
+  method Bool biasWillDone() = index_bias + 1 >= fromInteger(valueOf(lines));
 
 endmodule
