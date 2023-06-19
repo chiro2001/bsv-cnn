@@ -7,6 +7,11 @@ interface Layer#(type in, type out);
   method ActionValue#(out) get;
 endinterface
 
+interface LayerDirect#(type in, type out);
+  method Action put(in x);
+  method out get;
+endinterface
+
 module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   provisos(
     Bits#(out, lines_bits), 
@@ -40,7 +45,6 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     let top = fifo_in.first;
     out t = tmp;
     let bias <- data.getBias();
-    // if (layer_name == "fc2") $display("Layer %s: bias=%x", layer_name, bias);
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       let w <- weight[i];
       let mul = top[i] * w;
@@ -49,15 +53,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
       else t[i] = tmp[i] + (mul >> 6);
     end
     tmp <= t;
-    // if (layer_name == "fc2") $display("Layer %s: t=%x", layer_name, pack(t));
   endrule
-
-  // rule display_index (fifo_in.notEmpty && layer_name == "fc2");
-  //   let index = data.getIndex() - 1;
-  //   let index_bias = data.getIndexLines() - 1;
-  //   $display("Layer %s: done=%x, index=%x, index_bias=%x, weights_done=%x, bias_done=%x, tmp=%x", 
-  //     layer_name, done, index, index_bias, data.weightsDone(), data.biasDone(), pack(tmp));
-  // endrule
 
   rule acc_weights_only (!done && !data.weightsDone() && data.biasDone());
     let index = data.getIndex() - 1;
@@ -99,4 +95,31 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     fifo_out.deq;
     return y;
   endmethod
+endmodule
+
+module mkSoftmaxLayer(LayerDirect#(in, out))
+  provisos (
+    Bits#(in, input_bits), 
+    Mul#(input_size, 8, input_bits), 
+    PrimSelectable#(in, Int#(8)),
+    Bits#(out, output_bits),
+    PrimIndex#(out, a__),
+    Log#(input_size, output_bits)
+  );
+
+  // Wire#(in) data <- mkDWire(pack('0));
+  Wire#(in) data <- mkWire;
+
+  method Action put(in x);
+    data <= x;
+  endmethod
+
+  method out get;
+    out y = unpack('0);
+    for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
+      if (data[i] > data[y]) y = fromInteger(i);
+    end
+    return y;
+  endmethod
+
 endmodule

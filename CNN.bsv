@@ -8,6 +8,7 @@ module mkTb();
 
 Layer#(Vector#(784, Int#(8)), Vector#(32, Int#(8))) fc1 <- mkFCLayer("fc1");
 Layer#(Vector#(32, Int#(8)), Vector#(10, Int#(8))) fc2 <- mkFCLayer("fc2");
+LayerDirect#(Vector#(10, Int#(8)), Bit#(4)) softmax <- mkSoftmaxLayer;
 
 Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 10000;
@@ -37,13 +38,30 @@ rule put_data_fc2;
   fc2.put(out);
 endrule
 
-rule get_data_fc2;
-  Vector#(10, Int#(8)) data <- fc2.get;
-  $write("[cnt=%x] Got fc2 data:", cnt);
-  for (Integer i = 0; i < 10; i = i + 1) begin
-    $write(" %d", data[i]);
-  end
-  $display("");
+rule put_data_softmax;
+  let out <- fc2.get;
+  $display("[cnt=%x] fc2 -> softmax, out=%x", cnt, pack(out));
+  softmax.put(out);
+  // $write("[cnt=%x] Got fc2 data:", cnt);
+  // for (Integer i = 0; i < 10; i = i + 1) begin
+  //   $write("[%d: %d], ", i, out[i]);
+  // end
+  // $display("");
+endrule
+
+// rule get_data_fc2;
+//   Vector#(10, Int#(8)) data <- fc2.get;
+//   $write("[cnt=%x] Got fc2 data:", cnt);
+//   for (Integer i = 0; i < 10; i = i + 1) begin
+//     $write("[%d: %d], ", i, data[i]);
+//   end
+//   $display("");
+//   // $finish;
+// endrule
+
+rule get_data_softmax;
+  let data = softmax.get;
+  $display("[cnt=%x] Got softmax data: %d", cnt, data);
   // $finish;
 endrule
 
