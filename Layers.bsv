@@ -154,3 +154,10 @@ module mkReluLayer(Layer#(in, out))
   endmethod
 
 endmodule
+
+module mkConvLayer(Layer#(in, out))
+  provisos (
+
+  );
+
+endmodule

@@ -192,5 +192,5 @@ def test_floats():
 
 if __name__ == '__main__':
   # test_floats()
-  fc()
+  # fc()
   cnn()
