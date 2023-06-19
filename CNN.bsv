@@ -8,7 +8,7 @@ module mkTb();
 
 Layer#(Vector#(784, Int#(8)), Vector#(32, Int#(8))) fc1 <- mkFCLayer("fc1");
 Layer#(Vector#(32, Int#(8)), Vector#(10, Int#(8))) fc2 <- mkFCLayer("fc2");
-LayerDirect#(Vector#(10, Int#(8)), Bit#(4)) softmax <- mkSoftmaxLayer;
+Layer#(Vector#(10, Int#(8)), Bit#(4)) softmax <- mkSoftmaxLayer;
 
 Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 10000;
@@ -60,7 +60,7 @@ endrule
 // endrule
 
 rule get_data_softmax;
-  let data = softmax.get;
+  Bit#(4) data <- softmax.get;
   $display("[cnt=%x] Got softmax data: %d", cnt, data);
   // $finish;
 endrule

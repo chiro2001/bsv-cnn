@@ -1,4 +1,5 @@
 import FIFOF::*;
+import FIFO::*;
 import Vector::*;
 import Data::*;
 
@@ -97,7 +98,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   endmethod
 endmodule
 
-module mkSoftmaxLayer(LayerDirect#(in, out))
+module mkSoftmaxLayer(Layer#(in, out))
   provisos (
     Bits#(in, input_bits), 
     Mul#(input_size, 8, input_bits), 
@@ -107,19 +108,19 @@ module mkSoftmaxLayer(LayerDirect#(in, out))
     Log#(input_size, output_bits)
   );
 
-  // Wire#(in) data <- mkDWire(pack('0));
-  Wire#(in) data <- mkWire;
+  FIFO#(out) fifo_out <- mkFIFO1;
 
   method Action put(in x);
-    data <= x;
-  endmethod
-
-  method out get;
     out y = unpack('0);
     for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
-      if (data[i] > data[y]) y = fromInteger(i);
+      if (x[i] > x[y]) y = fromInteger(i);
     end
-    return y;
+    fifo_out.enq(y);
+  endmethod
+
+  method ActionValue#(out) get;
+    fifo_out.deq;
+    return fifo_out.first;
   endmethod
 
 endmodule

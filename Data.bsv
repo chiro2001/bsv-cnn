@@ -52,12 +52,6 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
       loadFormat: tagged Hex bias_path
     });
 
-  // // default value?
-  // rule set_addr /*(index != 'haaaaaaaa)*/;
-  //   addr <= index;
-  //   addr_bias <= index_bias;
-  // endrule
-
   rule read_weights (!weightsWillDoneBool);
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       weights[i].portA.request.put(BRAMRequest{
