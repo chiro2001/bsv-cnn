@@ -165,3 +165,5 @@ cython_debug/
 *.so
 *.vcd
 *.o
+
+/mkTb.v
