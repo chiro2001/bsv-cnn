@@ -124,3 +124,33 @@ module mkSoftmaxLayer(Layer#(in, out))
   endmethod
 
 endmodule
+
+module mkReluLayer(Layer#(in, out))
+  provisos (
+    Bits#(in, input_bits), 
+    Mul#(input_size, 8, input_bits), 
+    PrimSelectable#(in, Int#(8)),
+    Bits#(out, output_bits), 
+    Mul#(output_size, 8, output_bits), 
+    PrimSelectable#(out, Int#(8)),
+    Add#(input_bits, 0, output_bits),
+    PrimUpdateable#(out, Int#(8))
+  );
+
+  FIFO#(out) fifo_out <- mkFIFO1;
+
+  method Action put(in x);
+    out y;
+    for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
+      if (x[i] < 0) y[i] = 0;
+      else y[i] = x[i];
+    end
+    fifo_out.enq(y);
+  endmethod
+
+  method ActionValue#(out) get;
+    fifo_out.deq;
+    return fifo_out.first;
+  endmethod
+
+endmodule

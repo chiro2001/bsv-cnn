@@ -7,6 +7,7 @@ import Layers::*;
 module mkTb();
 
 Layer#(Vector#(784, Int#(8)), Vector#(32, Int#(8))) fc1 <- mkFCLayer("fc1");
+Layer#(Vector#(32, Int#(8)), Vector#(32, Int#(8))) relu1 <- mkReluLayer;
 Layer#(Vector#(32, Int#(8)), Vector#(10, Int#(8))) fc2 <- mkFCLayer("fc2");
 Layer#(Vector#(10, Int#(8)), Bit#(4)) softmax <- mkSoftmaxLayer;
 
@@ -32,9 +33,15 @@ rule put_data;
   // fc1.put(unpack('h2345678765));
 endrule
 
-rule put_data_fc2;
+rule put_data_relu1;
   let out <- fc1.get;
   // $display("[cnt=%x] fc1 -> fc2, out=%x", cnt, pack(out));
+  relu1.put(out);
+endrule
+
+rule put_data_fc2;
+  let out <- relu1.get;
+  // $display("[cnt=%x] relu1 -> fc2, out=%x", cnt, pack(out));
   fc2.put(out);
 endrule
 
