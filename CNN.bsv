@@ -29,13 +29,13 @@ rule put_data;
 endrule
 
 rule get_data;
-  $display("Getting data");
   Vector#(32, Int#(8)) data <- fc1.get;
   $write("Got data:");
   for (Integer i = 0; i < 32; i = i + 1) begin
     $write(" %d", data[i]);
   end
-  $finish;
+  $display("");
+  // $finish;
 endrule
 
 endmodule
