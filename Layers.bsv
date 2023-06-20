@@ -2,6 +2,7 @@ import FIFOF::*;
 import FIFO::*;
 import Vector::*;
 import Data::*;
+import Utils::*;
 
 interface Layer#(type in, type out);
   method Action put(in x);
@@ -17,13 +18,13 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   provisos(
     Bits#(out, lines_bits), 
     Bits#(in, depth_bits), 
-    Mul#(lines, 8, lines_bits), 
-    Mul#(depth, 8, depth_bits),
-    PrimSelectable#(in, Int#(8)),
-    PrimSelectable#(out, Int#(8)),
-    PrimWriteable#(Reg#(out), Int#(8))
+    Mul#(lines, 16, lines_bits), 
+    Mul#(depth, 16, depth_bits),
+    PrimSelectable#(in, Int#(16)),
+    PrimSelectable#(out, Int#(16)),
+    PrimWriteable#(Reg#(out), Int#(16))
   );
-  LayerData_ifc#(Int#(8), lines, depth) data <- mkLayerData("fc", layer_name);
+  LayerData_ifc#(Int#(16), lines, depth) data <- mkLayerData("fc", layer_name);
   Reg#(Bool) done <- mkReg(True);
   Reg#(out) tmp <- mkReg(unpack('0));
 
@@ -43,7 +44,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     let index_bias = data.getBiasIndex() - 1;
     // $display("Layer %s acc weights, index=%x", layer_name, index);
     let weight_data <- data.getWeights();
-    Vector#(lines, Int#(8)) weight = unpack(weight_data);
+    Vector#(lines, Int#(16)) weight = unpack(weight_data);
     let top = fifo_in.first;
     out t = tmp;
     let bias <- data.getBias();
@@ -51,8 +52,8 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
       let w = weight[i];
       let mul = top[i] * w;
       if (fromInteger(i) == index_bias)
-        t[i] = tmp[i] + (mul >> 6) + bias;
-      else t[i] = tmp[i] + (mul >> 6);
+        t[i] = tmp[i] + (mul>> q_bits()) + bias;
+      else t[i] = tmp[i] + (mul>> q_bits());
     end
     tmp <= t;
   endrule
@@ -61,13 +62,13 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     let index = data.getWeightsIndex() - 1;
     // $display("Layer %s acc weights only, index=%x", layer_name, index);
     let weight_data <- data.getWeights();
-    Vector#(lines, Int#(8)) weight = unpack(weight_data);
+    Vector#(lines, Int#(16)) weight = unpack(weight_data);
     let top = fifo_in.first;
     out t = tmp;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       let w = weight[i];
       let mul = top[i] * w;
-      t[i] = tmp[i] + (mul >> 6);
+      t[i] = tmp[i] + (mul>> q_bits());
     end
     tmp <= t;
   endrule
@@ -102,8 +103,8 @@ endmodule
 module mkSoftmaxLayer(Layer#(in, out))
   provisos (
     Bits#(in, input_bits), 
-    Mul#(input_size, 8, input_bits), 
-    PrimSelectable#(in, Int#(8)),
+    Mul#(input_size, 16, input_bits), 
+    PrimSelectable#(in, Int#(16)),
     Bits#(out, output_bits),
     PrimIndex#(out, a__),
     Log#(input_size, output_bits)
@@ -129,13 +130,13 @@ endmodule
 module mkReluLayer(Layer#(in, out))
   provisos (
     Bits#(in, input_bits), 
-    Mul#(input_size, 8, input_bits), 
-    PrimSelectable#(in, Int#(8)),
+    Mul#(input_size, 16, input_bits), 
+    PrimSelectable#(in, Int#(16)),
     Bits#(out, output_bits), 
-    Mul#(output_size, 8, output_bits), 
-    PrimSelectable#(out, Int#(8)),
+    Mul#(output_size, 16, output_bits), 
+    PrimSelectable#(out, Int#(16)),
     Add#(input_bits, 0, output_bits),
-    PrimUpdateable#(out, Int#(8))
+    PrimUpdateable#(out, Int#(16))
   );
 
   FIFO#(out) fifo_out <- mkFIFO1;
@@ -160,19 +161,19 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
 // now assuming that stride == 1
   provisos (
     Bits#(in, input_bits),
-    Mul#(input_size, 8, input_bits),
+    Mul#(input_size, 16, input_bits),
     Mul#(input_lines, input_lines, input_size),
     Bits#(out, output_bits),
-    Mul#(TMul#(output_size, 8), output_channels, output_bits),
+    Mul#(TMul#(output_size, 16), output_channels, output_bits),
     Mul#(output_lines, output_lines, output_size),
     // 2D vectors required
-    PrimSelectable#(in, Vector::Vector#(input_lines, Int#(8))),
-    PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(8)))),
+    PrimSelectable#(in, Vector::Vector#(input_lines, Int#(16))),
+    PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(16)))),
     Add#(output_lines, kernel_size, TAdd#(input_lines, 1)),
     Mul#(kernel_size, kernel_size, kernel_size_2),
-    Mul#(kernel_size_2, 8, kernel_size_2_bits),
+    Mul#(kernel_size_2, 16, kernel_size_2_bits),
     Add#(kernel_size, 0, 3),
-    PrimUpdateable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(8))))
+    PrimUpdateable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(16))))
   );
 
   FIFOF#(in) fifo_in <- mkFIFOF1;
@@ -185,8 +186,8 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   endrule
 
   Wire#(Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits)))) cols <- mkWire;
-  // Vector#(output_lines, Vector#(output_lines, Reg#(Int#(8)))) data_out <- replicateM(replicateM(mkReg(0)));
-  // Reg#(Vector#(output_lines, Vector#(output_lines, Int#(8)))) data_out <- mkReg(unpack('0));
+  // Vector#(output_lines, Vector#(output_lines, Reg#(Int#(16)))) data_out <- replicateM(replicateM(mkReg(0)));
+  // Reg#(Vector#(output_lines, Vector#(output_lines, Int#(16)))) data_out <- mkReg(unpack('0));
 
   rule bind_cols;
     Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
@@ -208,7 +209,7 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     cols <= cols_;
   endrule
 
-  LayerData_ifc#(Int#(8), kernel_size_2, output_channels) data <- mkLayerData("cnn", layer_name);
+  LayerData_ifc#(Int#(16), kernel_size_2, output_channels) data <- mkLayerData("cnn", layer_name);
   Reg#(Bool) done <- mkReg(True);
   Reg#(out) tmp <- mkReg(unpack('0));
 
@@ -224,18 +225,18 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     let index = data.getWeightsIndex() - 1;
     // $display("Layer %s acc weights, index=%x", layer_name, index);
     let weight_data <- data.getWeights();
-    Vector#(kernel_size_2, Int#(8)) kernel = unpack(weight_data);
+    Vector#(kernel_size_2, Int#(16)) kernel = unpack(weight_data);
     let top = fifo_in.first;
     out t = tmp;
     let bias <- data.getBias();
     for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
       for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-        Int#(8) s = 0;
-        Vector#(kernel_size_2, Int#(8)) col = unpack(cols[i][j]);
+        Int#(16) s = 0;
+        Vector#(kernel_size_2, Int#(16)) col = unpack(cols[i][j]);
         // for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
-        //   s = s + ((col[k] * kernel[k]) >> 6);
+        //   s = s + ((col[k] * kernel[k])>> q_bits());
         // end
-        s = ((col[0] * kernel[0]) >> 6);
+        s = ((col[0] * kernel[0])>> q_bits());
         t[index][i][j] = s + bias;
       end
     end

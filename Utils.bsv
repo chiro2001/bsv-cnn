@@ -24,3 +24,7 @@ function String numberToString(Integer i);
   if (num == "") num = "0";
   return num;
 endfunction
+
+function Integer q_bits();
+  return 8;
+endfunction

@@ -6,10 +6,10 @@ import Layers::*;
 
 module mkTb();
 
-Layer#(Vector#(784, Int#(8)), Vector#(32, Int#(8))) fc1 <- mkFCLayer("fc1");
-Layer#(Vector#(32, Int#(8)), Vector#(32, Int#(8))) relu1 <- mkReluLayer;
-Layer#(Vector#(32, Int#(8)), Vector#(10, Int#(8))) fc2 <- mkFCLayer("fc2");
-Layer#(Vector#(10, Int#(8)), Bit#(4)) softmax <- mkSoftmaxLayer;
+Layer#(Vector#(784, Int#(16)), Vector#(32, Int#(16))) fc1 <- mkFCLayer("fc1");
+Layer#(Vector#(32, Int#(16)), Vector#(32, Int#(16))) relu1 <- mkReluLayer;
+Layer#(Vector#(32, Int#(16)), Vector#(10, Int#(16))) fc2 <- mkFCLayer("fc2");
+Layer#(Vector#(10, Int#(16)), Bit#(4)) softmax <- mkSoftmaxLayer;
 
 Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 10000;
@@ -57,7 +57,7 @@ rule put_data_softmax;
 endrule
 
 // rule get_data_fc2;
-//   Vector#(10, Int#(8)) data <- fc2.get;
+//   Vector#(10, Int#(16)) data <- fc2.get;
 //   $write("[cnt=%x] Got fc2 data:", cnt);
 //   for (Integer i = 0; i < 10; i = i + 1) begin
 //     $write("[%d: %d], ", i, data[i]);

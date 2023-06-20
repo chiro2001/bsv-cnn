@@ -13,7 +13,7 @@ module mkTb();
   endrule
 
   String test_bias_data_file = "../data/fc-fc1.bias.hex";
-  BRAM1Port#(Bit#(10), Bit#(8)) test_bias_data <- mkBRAM1Server(BRAM_Configure{
+  BRAM1Port#(Bit#(10), Bit#(16)) test_bias_data <- mkBRAM1Server(BRAM_Configure{
     memorySize: 32, 
     latency: 1, 
     outFIFODepth: 3, 
@@ -22,7 +22,7 @@ module mkTb();
   });
 
   String test_weight_path = "../data/fc-fc1.weight/";
-  Vector#(32, BRAM1Port#(Bit#(10), Bit#(8))) weights;
+  Vector#(32, BRAM1Port#(Bit#(10), Bit#(16))) weights;
   Vector#(10, String) digitals;
   digitals[0] = "0";
   digitals[1] = "1";
@@ -73,11 +73,11 @@ module mkTb();
   endrule
 
   rule test_read_bias;
-    Bit#(8) bdata <- test_bias_data.portA.response.get();
+    Bit#(16) bdata <- test_bias_data.portA.response.get();
     $display("bias = %d", bdata);
     for (Integer i = 0; i < 32; i = i + 1) begin
-      Bit#(8) wdata <- weights[i].portA.response.get();
-      Int#(8) d = unpack(wdata);
+      Bit#(16) wdata <- weights[i].portA.response.get();
+      Int#(16) d = unpack(wdata);
       $write("%d ", d);
     end
     $display("");
