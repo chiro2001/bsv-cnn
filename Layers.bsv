@@ -42,12 +42,13 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     let index = data.getWeightsIndex() - 1;
     let index_bias = data.getBiasIndex() - 1;
     // $display("Layer %s acc weights, index=%x", layer_name, index);
-    let weight = data.getWeights();
+    let weight_data <- data.getWeights();
+    Vector#(lines, Int#(8)) weight = unpack(weight_data);
     let top = fifo_in.first;
     out t = tmp;
     let bias <- data.getBias();
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      let w <- weight[i];
+      let w = weight[i];
       let mul = top[i] * w;
       if (fromInteger(i) == index_bias)
         t[i] = tmp[i] + (mul >> 6) + bias;
@@ -59,11 +60,12 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   rule acc_weights_only (!done && !data.weightsDone() && data.biasDone());
     let index = data.getWeightsIndex() - 1;
     // $display("Layer %s acc weights only, index=%x", layer_name, index);
-    let weight = data.getWeights();
+    let weight_data <- data.getWeights();
+    Vector#(lines, Int#(8)) weight = unpack(weight_data);
     let top = fifo_in.first;
     out t = tmp;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      let w <- weight[i];
+      let w = weight[i];
       let mul = top[i] * w;
       t[i] = tmp[i] + (mul >> 6);
     end

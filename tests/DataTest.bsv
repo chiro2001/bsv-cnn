@@ -12,7 +12,7 @@ module mkTb();
     if (cnt == 30) $finish;
   endrule
 
-  String test_bias_data_file = "../data/fc-fc1.bias.int8";
+  String test_bias_data_file = "../data/fc-fc1.bias.hex";
   BRAM1Port#(Bit#(10), Bit#(8)) test_bias_data <- mkBRAM1Server(BRAM_Configure{
     memorySize: 32, 
     latency: 1, 

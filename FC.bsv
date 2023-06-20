@@ -20,7 +20,7 @@ endrule
 
 rule stop (cnt >= fromInteger(max_cnt));
   $display("Stopping");
-  $finish;
+  $finish(0);
 endrule
 
 rule inc_cnt (cnt < fromInteger(max_cnt));
@@ -69,7 +69,7 @@ endrule
 rule get_data_softmax;
   Bit#(4) data <- softmax.get;
   $display("[cnt=%x] Got softmax data: %d", cnt, data);
-  // $finish;
+  // $finish(0);
 endrule
 
 endmodule

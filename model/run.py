@@ -63,6 +63,14 @@ def write_hex(data, path):
     for i in range(len(data)):
       f.write("{:02X}\n".format(data[i]))
 
+def write_hex_2d(data, path):
+  data = data.reshape([data.shape[0], -1])
+  with open(path, "w") as f:
+    for i in range(data.shape[0]):
+      for j in range(data.shape[1]):
+        f.write("{:02X}".format(data[i][j]))
+      f.write("\n")
+
 def dump_bsv(model, vector: bool = False):
   name = model.name.lower()
   with open(GEN_PATH + name + ".bsv", "w") as f:
@@ -134,10 +142,13 @@ def dump_binary_hex(model):
     save_path = DATA_PATH + model.name + '-' + k + ".bin"
     array = data[k].numpy()
     array.astype(np.float32).tofile(save_path)
-    save_path_int8 = DATA_PATH + model.name + '-' + k + ".int8"
+    save_path_int8 = DATA_PATH + model.name + '-' + k + ".hex"
     array_uint8 = np.array([float2fix(x, 6) for x in array.flatten()], dtype="uint8")
     # array_int8.tofile(save_path_int8)
-    write_hex(array_uint8, save_path_int8)
+    if len(array.shape) == 1:
+      write_hex(array_uint8, save_path_int8)
+    else:
+      write_hex_2d(array_uint8.reshape(array.shape).T, save_path_int8)
     print(model.name, k, data[k].shape, "max", array.max(), "min", array.min(), "int8 max", array_uint8.max(), "int8 min", array_uint8.min(), save_path)
     array_restore = np.array([fix2float(x, 6) for x in np.array(array_uint8, dtype="int8").flatten()]).astype(np.float32).reshape(array.shape)
     data_new[k] = torch.from_numpy(array_restore)
@@ -192,5 +203,5 @@ def test_floats():
 
 if __name__ == '__main__':
   # test_floats()
-  # fc()
-  cnn()
+  fc()
+  # cnn()
