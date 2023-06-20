@@ -12,7 +12,8 @@ if [[ -z "$ROOT" ]]; then
 fi
 
 # CUSTOMBSV="-p +:$ROOT/bluelib/src"
-CUSTOMBSV="-p +:$ROOT/gen"
+# CUSTOMBSV="-p +:$ROOT/gen"
+CUSTOMBSV="+RTS -Ksize -RTS"
 
 alias echo="echo -e"
 

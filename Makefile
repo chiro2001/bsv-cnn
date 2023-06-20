@@ -1,10 +1,10 @@
 MAX_TIME ?= 10000
 ROOT ?= $(shell pwd)
 TESTS ?= $(shell ls tests/*.bsv | sed 's/\.bsv//g' | sed 's/tests\///g')
-BSC_ARGS += -bsw mkTb
+BSC_ARGS += -vs mkTb
 BSC_VERILOG_ARGS += -v mkTb
 
-all: FC
+all: CNN
 
 bsv-%:
 	-ROOT=$(ROOT) $(ROOT)/bsvbuild.sh $(BSC_ARGS) $*.bsv $(MAX_TIME)

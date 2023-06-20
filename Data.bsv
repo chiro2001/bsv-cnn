@@ -3,19 +3,17 @@ import Vector::*;
 import BRAM::*;
 
 interface LayerData_ifc#(type td, type lines, type depth);
-  method Vector#(lines, ActionValue#(td)) getWeight();
+  method Vector#(lines, ActionValue#(td)) getWeights();
   method ActionValue#(td) getBias();
-  method Action weightStart();
+  method Action weightsStart();
   method Action biasStart();
-  method Bit#(TAdd#(TLog#(depth), 1)) getIndex();
-  method Bit#(TAdd#(TLog#(lines), 1)) getIndexLines();
+  method Bit#(TAdd#(TLog#(depth), 1)) getWeightsIndex();
+  method Bit#(TAdd#(TLog#(lines), 1)) getBiasIndex();
   method Bool weightsDone();
   method Bool biasDone();
-  method Bool weightsWillDone();
-  method Bool biasWillDone();
 endinterface
 
-module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth))
+module mkLayerData#(parameter String model_name, parameter String layer_name)(LayerData_ifc#(td, lines, depth))
     provisos (
       Bits#(td, sz), 
       Literal#(td), 
@@ -31,7 +29,7 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
   let biasDoneBool = index_bias >= fromInteger(valueOf(lines) + 1);
   let biasWillDoneBool = index_bias >= fromInteger(valueOf(lines));
 
-  String weights_path = "data/fc-" + layer_name + ".weight/";
+  String weights_path = "data/" + model_name + "-" + layer_name + ".weight/";
   for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
     let path = weights_path + numberToString(i);
     weights[i] <- mkBRAM1Server(BRAM_Configure{
@@ -43,7 +41,7 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
     });
   end
 
-  String bias_path = "data/fc-" + layer_name + ".bias.int8";
+  String bias_path = "data/" + model_name + "-" + layer_name + ".bias.int8";
   BRAM1Port#(Bit#(TAdd#(lines_log, 1)), td) bias <- mkBRAM1Server(BRAM_Configure{
       memorySize: valueOf(lines), 
       latency: 1, 
@@ -84,13 +82,13 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
     return weights[i].portA.response.get();
   endfunction
 
-  method Vector#(lines, ActionValue#(td)) getWeight();
+  method Vector#(lines, ActionValue#(td)) getWeights();
     return map(getWeightValue, genVector);
   endmethod
 
   method getBias = bias.portA.response.get;
 
-  method Action weightStart();
+  method Action weightsStart();
     index <= 0;
   endmethod
 
@@ -98,12 +96,10 @@ module mkLayerData#(parameter String layer_name)(LayerData_ifc#(td, lines, depth
     index_bias <= 0;
   endmethod
 
-  method getIndex = index;
-  method getIndexLines = index_bias;
+  method getWeightsIndex = index;
+  method getBiasIndex = index_bias;
 
   method Bool weightsDone() = weightsDoneBool;
   method Bool biasDone() = biasDoneBool;
-  method Bool weightsWillDone() = weightsWillDoneBool;
-  method Bool biasWillDone() = biasWillDoneBool;
 
 endmodule

@@ -15,7 +15,7 @@ Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 10000;
 
 rule hello (cnt == 0);
-  $display("Hello CNN");
+  $display("Hello FC");
 endrule
 
 rule stop (cnt >= fromInteger(max_cnt));
