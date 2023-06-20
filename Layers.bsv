@@ -42,18 +42,22 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   rule acc_weights_bias (!done && !data.weightsDone() && !data.biasDone());
     let index = data.getWeightsIndex() - 1;
     let index_bias = data.getBiasIndex() - 1;
-    // $display("Layer %s acc weights, index=%x", layer_name, index);
     let weight_data <- data.getWeights();
     Vector#(lines, Int#(16)) weight = unpack(weight_data);
     let top = fifo_in.first;
     out t = tmp;
     let bias <- data.getBias();
+    // $display("Layer %s acc weights, index=%x, tmp=%x", layer_name, index, pack(tmp));
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      let w = weight[i];
-      let mul = top[i] * w;
-      if (fromInteger(i) == index_bias)
-        t[i] = tmp[i] + (mul>> q_bits()) + bias;
-      else t[i] = tmp[i] + (mul>> q_bits());
+      Int#(32) w = extend(weight[i]);
+      Int#(32) top_i = extend(top[i]);
+      Int#(32) mul = top_i * w;
+      Int#(16) truncated = truncate(mul >> q_bits());
+      // check overflow
+      // if (extend(truncated) != (mul >> q_bits())) begin
+      //   $display("Layer %s acc weights, index=%x, overflow", layer_name, index);
+      // end
+      t[i] = tmp[i] + truncated + (fromInteger(i) == index_bias ? bias : 0);
     end
     tmp <= t;
   endrule
@@ -66,9 +70,11 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     let top = fifo_in.first;
     out t = tmp;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      let w = weight[i];
-      let mul = top[i] * w;
-      t[i] = tmp[i] + (mul>> q_bits());
+      Int#(32) w = extend(weight[i]);
+      Int#(32) top_i = extend(top[i]);
+      Int#(32) mul = top_i * w;
+      Int#(16) truncated = truncate(mul >> q_bits());
+      t[i] = tmp[i] + truncated;
     end
     tmp <= t;
   endrule

@@ -11,6 +11,8 @@ Layer#(Vector#(32, Int#(16)), Vector#(32, Int#(16))) relu1 <- mkReluLayer;
 Layer#(Vector#(32, Int#(16)), Vector#(10, Int#(16))) fc2 <- mkFCLayer("fc2");
 Layer#(Vector#(10, Int#(16)), Bit#(4)) softmax <- mkSoftmaxLayer;
 
+TestData_ifc#(Int#(16), 28) input_data <- mkTestData;
+
 Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 10000;
 
@@ -28,26 +30,34 @@ rule inc_cnt (cnt < fromInteger(max_cnt));
 endrule
 
 rule put_data;
-  $display("[cnt=%x] Putting data", cnt);
-  fc1.put(unpack('0));
+  // fc1.put(unpack('0));
   // fc1.put(unpack('h2345678765));
+  // match {.target, .data} <- input_data.get;
+  let d <- input_data.get;
+  // Tuple2#(Int#(16), Vector::Vector#(28, Vector::Vector#(28, Int#(16)))) d_pack = unpack(d);
+  Tuple2#(Int#(16), Vector::Vector#(784, Int#(16))) d_pack = unpack(d);
+  match {.target, .data} = d_pack;
+  let real_target = target >> q_bits();
+  fc1.put(data);
+  // fc1.put(unpack('1));
+  $display("[cnt=%x] Putting target %d", cnt, real_target);
 endrule
 
 rule put_data_relu1;
   let out <- fc1.get;
-  // $display("[cnt=%x] fc1 -> fc2, out=%x", cnt, pack(out));
+  $display("[cnt=%x] fc1 -> relu1, out=%x", cnt, pack(out));
   relu1.put(out);
 endrule
 
 rule put_data_fc2;
   let out <- relu1.get;
-  // $display("[cnt=%x] relu1 -> fc2, out=%x", cnt, pack(out));
+  $display("[cnt=%x] relu1 -> fc2, out=%x", cnt, pack(out));
   fc2.put(out);
 endrule
 
 rule put_data_softmax;
   let out <- fc2.get;
-  // $display("[cnt=%x] fc2 -> softmax, out=%x", cnt, pack(out));
+  $display("[cnt=%x] fc2 -> softmax, out=%x", cnt, pack(out));
   softmax.put(out);
   // $write("[cnt=%x] Got fc2 data:", cnt);
   // for (Integer i = 0; i < 10; i = i + 1) begin

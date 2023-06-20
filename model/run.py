@@ -73,17 +73,21 @@ def set_seed(seed):
   random.seed(seed)  # random and transforms
 
 def write_hex(data, path):
+  fmt = ("{:0" + str(int(Q_TYPE[3:]) // 4) + "X}\n")
   with open(path, "w") as f:
     for i in range(len(data)):
-      f.write("{:02X}\n".format(data[i]))
+      d = fmt.format(int(data[i]))
+      # print('fmt', fmt[:-1], 'd', d[:-1], 'data', data[i], 'int(data[i])', int(data[i]))
+      f.write(d)
 
 def write_hex_2d(data, path):
   # print('write_hex_2d: data shape', data.shape)
+  fmt = ("{:0" + str(int(Q_TYPE[3:]) // 4) + "X}")
   data = data.reshape([data.shape[0], -1])
   with open(path, "w") as f:
     for i in range(data.shape[0]):
       for j in range(data.shape[1]):
-        f.write("{:02X}".format(data[i][j]))
+        f.write(fmt.format(data[i][j]))
       f.write("\n")
 
 def dump_bsv(model, vector: bool = False):
@@ -156,8 +160,8 @@ def dump_binary_hex(model):
   n = Q_BITS
   dtype = Q_TYPE
   for k in data:
-    save_path = DATA_PATH + model.name + '-' + k + ".bin"
     array = data[k].numpy()
+    # save_path = DATA_PATH + model.name + '-' + k + ".bin"
     # array.astype(np.float32).tofile(save_path)
     save_path_hex = DATA_PATH + model.name + '-' + k + ".hex"
     array_uint = np.array([float2fix(x, n) for x in array.flatten()], dtype="u" + dtype)
@@ -185,7 +189,7 @@ def dump_binary_hex(model):
     #     d = np.hstack(a)
     #     write_hex(d, save_path_dir + "/" + str(i))
   model.load_state_dict(data_new)
-  test(model, device)
+  # test(model, device)
   q_test(model, device)
         
 
@@ -230,7 +234,20 @@ def test_floats():
   print(num2, fix, fl2)
   print(num * num2, f, f2, fl * fl2)
 
+def dump_test_set():
+  for data, target in test_loader:
+    data, target = data.to(device), target.to(device)
+    data, target = data.numpy(), target.numpy()
+    data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype="u" + Q_TYPE).reshape(data.shape)
+    target = np.array([float2fix(x, Q_BITS) for x in target.flatten()], dtype="u" + Q_TYPE)
+    print('data', data.shape, 'target', target.shape)
+    path = DATA_PATH + "test_input"
+    write_hex_2d(data, path + ".data" + ".hex")
+    write_hex(target, path + ".target" + ".hex")
+    break
+
 if __name__ == '__main__':
   # test_floats()
+  dump_test_set()
   fc()
-  cnn()
+  # cnn()
