@@ -232,9 +232,10 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
       for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
         Int#(8) s = 0;
         Vector#(kernel_size_2, Int#(8)) col = unpack(cols[i][j]);
-        for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
-          s = s + ((col[k] * kernel[k]) >> 6);
-        end
+        // for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
+        //   s = s + ((col[k] * kernel[k]) >> 6);
+        // end
+        s = ((col[0] * kernel[0]) >> 6);
         t[index][i][j] = s + bias;
       end
     end
