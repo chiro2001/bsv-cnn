@@ -163,72 +163,35 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     Mul#(input_size, 8, input_bits),
     Mul#(input_lines, input_lines, input_size),
     Bits#(out, output_bits),
-    Mul#(output_size, 8, output_bits),
+    Mul#(TMul#(output_size, 8), output_channels, output_bits),
     Mul#(output_lines, output_lines, output_size),
     // 2D vectors required
     PrimSelectable#(in, Vector::Vector#(input_lines, Int#(8))),
-    PrimSelectable#(out, Vector::Vector#(output_lines, Int#(8))),
+    PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(8)))),
     Add#(output_lines, kernel_size, TAdd#(input_lines, 1)),
     Mul#(kernel_size, kernel_size, kernel_size_2),
     Mul#(kernel_size_2, 8, kernel_size_2_bits),
-    Add#(kernel_size, 0, 3)
+    Add#(kernel_size, 0, 3),
+    PrimUpdateable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(8))))
   );
 
   FIFOF#(in) fifo_in <- mkFIFOF1;
   FIFOF#(out) fifo_out <- mkFIFOF1;
 
-  Wire#(in) data_in <- 
-    // mkDWire(unpack('0));
-    mkWire;
+  Wire#(in) data_in <- mkWire;
 
   rule set_data_in;
     data_in <= fifo_in.first;
   endrule
 
-  // Wire#(Vector#(output_size, Bit#(kernel_size_2_bits))) cols <- 
-  Wire#(Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits)))) cols <-
-    // mkDWire(unpack('0));
-    mkWire;
+  Wire#(Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits)))) cols <- mkWire;
+  // Vector#(output_lines, Vector#(output_lines, Reg#(Int#(8)))) data_out <- replicateM(replicateM(mkReg(0)));
+  // Reg#(Vector#(output_lines, Vector#(output_lines, Int#(8)))) data_out <- mkReg(unpack('0));
 
   rule bind_cols;
-    // Vector#(output_size, Vector#(kernel_size_2, Int#(8))) cols_ = unpack(0);
-    // for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-    //   for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-    //     let idx = (i * valueOf(output_lines)) + j;
-    //     for (Integer a = 0; a < valueOf(kernel_size); a = a + 1) begin
-    //       for (Integer b = 0; b < valueOf(kernel_size); b = b + 1) begin
-    //         let k_idx = (a * valueOf(kernel_size)) + b;
-    //         cols_[idx][k_idx] = data_in[i + a][j + b];
-    //       end
-    //     end
-    //   end
-    // end
-    // Wire#(Vector#(output_size, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
-    // Vector#(output_size, Bit#(kernel_size_2_bits)) cols_;
     Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
-    // for (Integer i = 0; i < valueOf(output_size); i = i + 1) begin
-    //   // for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
-    //   //   cols_[i][k] = data_in[i / valueOf(output_lines) + k / valueOf(kernel_size)][i % valueOf(output_lines) + k % valueOf(kernel_size)];
-    //   // end
-    //   cols_[i] = pack({
-    //     pack(data_in[i / valueOf(output_lines)][i % valueOf(output_lines)]), 
-    //     pack(data_in[i / valueOf(output_lines)][i % valueOf(output_lines) + 1]), 
-    //     pack(data_in[i / valueOf(output_lines)][i % valueOf(output_lines) + 2]), 
-    //     pack(data_in[i / valueOf(output_lines) + 1][i % valueOf(output_lines)]), 
-    //     pack(data_in[i / valueOf(output_lines) + 1][i % valueOf(output_lines) + 1]),
-    //     pack(data_in[i / valueOf(output_lines) + 1][i % valueOf(output_lines) + 2]),
-    //     pack(data_in[i / valueOf(output_lines) + 2][i % valueOf(output_lines)]), 
-    //     pack(data_in[i / valueOf(output_lines) + 2][i % valueOf(output_lines) + 1]),
-    //     pack(data_in[i / valueOf(output_lines) + 2][i % valueOf(output_lines) + 2])
-    //   });
-    // end
     for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
       for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-        // cols_[i][j] = {
-        //   pack(data_in[i])[j*8:(j + 3)*8], 
-        //   pack(data_in[i + 1])[j*8:(j + 3)*8], 
-        //   pack(data_in[i + 2])[j*8:(j + 3)*8]
-        // };
         cols_[i][j] = {
           pack(data_in[i][j]),
           pack(data_in[i][j + 1]),
@@ -245,76 +208,46 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     cols <= cols_;
   endrule
 
-  // rule test;
-  //   // $display("input_lines=%d, output_lines=%d, kernel_size=%d", valueOf(input_lines), valueOf(output_lines), valueOf(kernel_size));
-  //   for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-  //     for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-  //       let idx = (i * valueOf(output_lines)) + j;
-  //       $display("cols[i=%d][j=%d] %x", cols[idx][0]);
-  //     end
-  //   end
-  // endrule
+  LayerData_ifc#(Int#(8), kernel_size_2, output_channels) data <- mkLayerData("cnn", layer_name);
+  Reg#(Bool) done <- mkReg(True);
+  Reg#(out) tmp <- mkReg(unpack('0));
 
-  // LayerData_ifc#(Int#(8), lines, depth) data <- mkLayerData("cnn", layer_name);
-  // Reg#(Bool) done <- mkReg(True);
-  // Reg#(out) tmp <- mkReg(unpack('0));
+  rule start (done && fifo_in.notEmpty && data.weightsDone() && data.biasDone());
+    // $display("Layer %s start", layer_name);
+    data.weightsStart();
+    data.biasStart();
+    done <= False;
+    tmp <= unpack('0);
+  endrule
 
-  // rule start (done && fifo_in.notEmpty && data.weightsDone() && data.biasDone());
-  //   // $display("Layer %s start", layer_name);
-  //   data.weightsStart();
-  //   data.biasStart();
-  //   done <= False;
-  //   tmp <= unpack('0);
-  // endrule
+  rule acc (!done && !data.weightsDone() && !data.biasDone());
+    let index = data.getWeightsIndex() - 1;
+    // $display("Layer %s acc weights, index=%x", layer_name, index);
+    let weight_data <- data.getWeights();
+    Vector#(kernel_size_2, Int#(8)) kernel = unpack(weight_data);
+    let top = fifo_in.first;
+    out t = tmp;
+    let bias <- data.getBias();
+    for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
+      for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
+        Int#(8) s = 0;
+        Vector#(kernel_size_2, Int#(8)) col = unpack(cols[i][j]);
+        for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
+          s = s + ((col[k] * kernel[k]) >> 6);
+        end
+        t[index][i][j] = s + bias;
+      end
+    end
+    tmp <= t;
+  endrule
 
-  // rule acc_weights_bias (!done && !data.weightsDone() && !data.biasDone());
-  //   let index = data.getWeightsIndex() - 1;
-  //   let index_bias = data.getBiasIndex() - 1;
-  //   // $display("Layer %s acc weights, index=%x", layer_name, index);
-  //   let weight = data.getWeights();
-  //   let top = fifo_in.first;
-  //   out t = tmp;
-  //   let bias <- data.getBias();
-  //   for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-  //     let w <- weight[i];
-  //     let mul = top[i] * w;
-  //     if (fromInteger(i) == index_bias)
-  //       t[i] = tmp[i] + (mul >> 6) + bias;
-  //     else t[i] = tmp[i] + (mul >> 6);
-  //   end
-  //   tmp <= t;
-  // endrule
-
-  // rule acc_weights_only (!done && !data.weightsDone() && data.biasDone());
-  //   let index = data.getWeightsIndex() - 1;
-  //   // $display("Layer %s acc weights only, index=%x", layer_name, index);
-  //   let weight = data.getWeights();
-  //   let top = fifo_in.first;
-  //   out t = tmp;
-  //   for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-  //     let w <- weight[i];
-  //     let mul = top[i] * w;
-  //     t[i] = tmp[i] + (mul >> 6);
-  //   end
-  //   tmp <= t;
-  // endrule
-
-  // rule acc_bias_only (!done && data.weightsDone() && !data.biasDone());
-  //   let index_bias = data.getBiasIndex() - 1;
-  //   // $display("Layer %s acc bias only, index_bias=%x", layer_name, index_bias);
-  //   let bias <- data.getBias();
-  //   out t = tmp;
-  //   t[index_bias] = tmp[index_bias] + bias;
-  //   tmp <= t;
-  // endrule
-
-  // rule set_done (!done && data.weightsDone() && data.biasDone());
-  //   // $display("Layer %s set done, tmp=%x", layer_name, pack(tmp));
-  //   done <= True;
-  //   fifo_out.enq(tmp);
-  //   fifo_in.deq;
-  //   tmp <= unpack('0);
-  // endrule
+  rule set_done (!done && data.weightsDone() && data.biasDone());
+    // $display("Layer %s set done, tmp=%x", layer_name, pack(tmp));
+    done <= True;
+    fifo_out.enq(tmp);
+    fifo_in.deq;
+    tmp <= unpack('0);
+  endrule
 
   method Action put(in x);
     fifo_in.enq(x);
