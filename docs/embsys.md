@@ -402,6 +402,8 @@ restore diff mean -2.1383167e-07 max 9.23872e-07 min -9.23872e-07
 Test Q: Accuracy: 9805/10000 (98%)
 ```
 
+`run.py` 同样对测试用数据集进行了数据量化和数据导出，导出为 `data/test_input.[data/target].hex` 文件，其中 `data/test_input.data.hex` 文件为输入数据，`data/test_input.target.hex` 文件为输入数据对应的标签。其中导出的数据经过 `torch.utils.data.DataLoader` 加工，进行随机打乱并数据归一化，然后选择其中的一部分测试集导出为 `.hex` 文件。
+
 ### 硬件部分
 
 硬件部分主要需要解决以下问题：
@@ -411,12 +413,494 @@ Test Q: Accuracy: 9805/10000 (98%)
 3. 如何计算矩阵相乘过程
 4. 如何输入输出
 
-#### 神经网络权重数据如何存储和读取
+#### 矩阵相乘过程
 
-在上文已经提到，模型数据导出为了 `.hex` 文件格式，其实就是为了便于 Verilog 读取。Verilog 读取 `.hex` 的方式是通过 `$readmemh` 函数，该函数的作用是从文件中读取文本格式的十六进制字符串数据并存储到指定的寄存器中，并且在综合时会被综合为 Block Memory 等利于存储的格式。
+在上文已经提到，模型数据导出为了 `.hex` 文件格式，其实就是为了便于 Verilog 读取。Verilog 读取 `.hex` 的方式是调用 `$readmemh` 函数，该函数的作用是从文件读取文本格式的十六进制字符串数据并存储到指定的寄存器中，并且在综合时会被综合为 Block Memory 等利于存储的格式。
+
+在矩阵计算的过程中，利用硬件的并行性和矩阵计算的特性，可以进行计算加速。
+
+以全连接神经网络的第一层为例，输入数据为 $28\times 28$ 的矩阵，矩阵中每个值都是 `int32` 的 32 位浮点数，其中小数部分占 20 位。
+
+将输入图像拉平（`flatten()`），成为 $1\times 784$ 的矩阵，与本层权重 $W$ 相乘，$W.shape = 784\times 32$，相乘过程为：
+
+1. 从矩阵 $W$ 中选择一列，形状为 $784 \times 1$
+2. 与输入数据向量每个对应位置元素相乘
+3. 将相乘结果相加，得到一个值
+4. 回到 1. 直到 $32$ 列全部被计算
+
+在这样的计算过程中，可以发现，每次选择权重矩阵中的一列，然后进行挨个相乘后相加运算，各列之间是并行计算的关系。即，我们可以并行地同时选择权重矩阵中的 32 列，并进行 784 次相乘相加，最后得到一列 32 个元素的向量，即得到本层矩阵乘法计算结果。
+
+#### 偏置相加过程
+
+不仅是模型的权重数据，模型的偏置数据也被写入 Block Memory。为了降低硬件复杂度，偏置数据同样只能每个周期读一次。
+
+为了在规定时间内将偏置读取并添加到上述矩阵乘法结果中，并尽量少地占用硬件逻辑，可以将偏置的读、数据加和过程，与矩阵运算过程融合。具体如下：
+
+1. 在矩阵乘法读取每一行元素数据的时候，同时读取当前“读指针”对应的偏置数据
+2. 如果当前时钟周期能够获取到这一列的对应偏置，则提早地将其加入求和过程
+3. 当矩阵乘法算法完成，偏置已经被加入到对应位置，结果就是本层神经网络输出
+
+于是，本层在每周期只读取一次权重和偏置数据的情况下，只需要矩阵长边（本例子中为 784）那么多时钟周期（忽略 FIFO 时钟延迟），即可得到本层神经网络计算结果。
+
+#### 代码实现细节
+
+定义每层神经网络的输入输出接口如下：
+
+```bsv
+interface Layer#(type in, type out);
+  method Action put(in x);
+  method ActionValue#(out) get;
+endinterface
+```
+
+- `put` 是一个 `Action method`，有效执行时会将一个 `in` 类型的数据添加到此层的 FIFO 输入缓冲中以便进一步计算。
+- `get` 是一个返回 `ActionValue` 的方法，有效执行时将 FIFO 输出缓冲中的数据取出传递给下一层网络。只有输出缓冲区有数据此方法才有效。
+
+**全连接层**
+
+定义全连接层模块如下：
+
+```bsv
+module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
+  provisos(
+    Bits#(out, lines_bits), 
+    Bits#(in, depth_bits), 
+    Mul#(lines, 32, lines_bits), 
+    Mul#(depth, 32, depth_bits),
+    PrimSelectable#(in, Int#(32)),
+    PrimSelectable#(out, Int#(32)),
+    PrimWriteable#(Reg#(out), Int#(32)),
+    Add#(TLog#(lines), a__, TLog#(depth))
+  );
+// ...
+endmodule
+```
+
+- `in` / `out` 为泛型的输入输出类型
+- `lines` 定义此层的权重行数，如 `fc1` 则 `lines = 32`
+- `depth` 定义此层的权重列数，如 `fc1` 则 `depth = 784`
+- `PrimSelectable#(*, Int#(32))` 定义输入输出都是一维向量格式
+- `Add#(TLog#(lines), a__, TLog#(depth))` 规定 `depth >= lines`，以简化逻辑
+
+神经网络数据加载模块接口定义如下：
+
+```bsv
+interface LayerData_ifc#(type td, type lines, type depth);
+  method ActionValue#(Bit#(TMul#(lines, SizeOf#(td)))) getWeights();
+  method ActionValue#(td) getBias();
+  method Action weightsStart();
+  method Action biasStart();
+  method Bit#(TAdd#(TLog#(depth), 1)) getWeightsIndex();
+  method Bit#(TAdd#(TLog#(lines), 1)) getBiasIndex();
+  method Bool weightsDone();
+  method Bool biasDone();
+endinterface
+```
+
+- `getWeights` 获取当前读取到的权重数据
+- `getBias` 获取当前获取到的偏置数据
+- `weightsStart` 设置权重读指针开始递增
+- `biasStart` 设置偏置读指针开始递增。权重和偏置指针是不同的，尽管它们在本设计中几乎同步
+- `getWeightsIndex`、`getBiasIndex` 获取当前指针值，其为上一周期获取到的值的对应指针
+- `weightsDone`、`biasDone` 两个指针是否分别已经完成一轮数据读取
+
+神经网络数据加载模块定义如下：
+
+```bsv
+module mkLayerData#(parameter String model_name, parameter String layer_name)(LayerData_ifc#(td, lines, depth))
+    provisos (
+      Bits#(td, sz), 
+      Literal#(td), 
+      Log#(depth, depth_log),
+      Log#(lines, lines_log),
+      Mul#(lines, sz, lines_bits)
+    );
+// ...
+endmodule
+```
+
+则在 `mkFCLayer` 中可以这样定义这个数据读取模块：
+
+```bsv
+LayerData_ifc#(Int#(32), lines, depth) data <- mkLayerData("fc", layer_name);
+```
+
+`mkFCLayer` 中管理两个 FIFO，一个负责读入数据的缓冲，一个负责读出数据的缓冲，二者容量都是 2，有满、空信号引出。
+
+```bsv
+  FIFOF#(in) fifo_in <- mkFIFOF;
+  FIFOF#(out) fifo_out <- mkFIFOF;
+```
+
+`mkFCLayer` 大致有以下几个状态：
+
+1. 等待 `fifo_in` 数据输入缓冲
+2. `fifo_in` 非空，设置读取模块的两个读指针开始从 0 递增
+3. 乘加权重数据，并加上对应的偏置数据
+4. 偏置数据处理完毕，乘加上剩下的权重数据
+5. 两个指针走完，将计算结果 `tmp` 压入 `fifo_out`，清除寄存器状态并返回 1.
+
+`mkFCLayer` 其他特殊处理：
+
+1. 为了尽量保证乘加的精度，`tmp` 中每个元素位宽设置为 64 位，尽量减少数值溢出，在数据压入 `fifo_out` 时才转换回 32 位
+2. 由于规定 `depth >= lines`，所以不需要处理只加 `bias` 的情况
+
+由于代码较长，不完整贴出。
+
+**ReLU 层**
+
+ReLU 层只需要一个 `fifo_out` 进行数据管理。
+
+它将所有小于 0 的输入数据置为 0，其他不变。
+
+```bsv
+module mkReluLayer(Layer#(in, out))
+  provisos (
+    Bits#(in, input_bits), 
+    Mul#(input_size, 32, input_bits), 
+    PrimSelectable#(in, Int#(32)),
+    Bits#(out, output_bits), 
+    Mul#(output_size, 32, output_bits), 
+    PrimSelectable#(out, Int#(32)),
+    Add#(input_bits, 0, output_bits),
+    PrimUpdateable#(out, Int#(32))
+  );
+
+  FIFO#(out) fifo_out <- mkFIFO1;
+
+  method Action put(in x);
+    out y;
+    for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
+      if (x[i] < 0) y[i] = 0;
+      else y[i] = x[i];
+    end
+    fifo_out.enq(y);
+  endmethod
+
+  method ActionValue#(out) get;
+    fifo_out.deq;
+    return fifo_out.first;
+  endmethod
+
+endmodule
+```
+
+**Softmax 层**
+
+标准的 Softmax 层应当将输出归一化，使之结果和为 1。这里为了节省硬件逻辑，只是选择出值最大的下标并输出。严格来说，这个应该可以算是 ArgMax 层。
+
+```bsv
+module mkSoftmaxLayer(Layer#(in, out))
+  provisos (
+    Bits#(in, input_bits), 
+    Mul#(input_size, 32, input_bits), 
+    PrimSelectable#(in, Int#(32)),
+    Bits#(out, output_bits),
+    PrimIndex#(out, a__)
+  );
+
+  FIFO#(out) fifo_out <- mkFIFO1;
+
+  method Action put(in x);
+    out y = unpack('0);
+    // just `hard' max
+    for (Integer i = 0; i < valueOf(input_size); i = i + 1)
+      if (x[i] > x[y]) y = fromInteger(i);
+    fifo_out.enq(y);
+  endmethod
+
+  method ActionValue#(out) get;
+    fifo_out.deq;
+    return fifo_out.first;
+  endmethod
+
+endmodule
+```
+
+**卷积层**
+
+卷积层 `mkConvLayer` 的逻辑与 `mkFCLayer` 类似，不同点有：
+
+1. 可以通过 `img2col` 的方式，将需要与卷积核进行运算的部分重新排列，进一步提高并行性
+2. 由于多了一层卷积，可以说输入输出的维度也是不同的，需要保持信息的二维特征
+
+由于本项目中卷积层实现尚未完全，所以暂时不可用。在后续会继续完善卷积部分。
+
+`mkConvLayer` 定义如下：
+
+```bsv
+module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
+// now assuming that stride == 1
+  provisos (
+    Bits#(in, input_bits),
+    Mul#(input_size, 32, input_bits),
+    Mul#(input_lines, input_lines, input_size),
+    Bits#(out, output_bits),
+    Mul#(TMul#(output_size, 32), output_channels, output_bits),
+    Mul#(output_lines, output_lines, output_size),
+    // 2D vectors required
+    PrimSelectable#(in, Vector::Vector#(input_lines, Int#(32))),
+    PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(32)))),
+    Add#(output_lines, kernel_size, TAdd#(input_lines, 1)),
+    Mul#(kernel_size, kernel_size, kernel_size_2),
+    Mul#(kernel_size_2, 32, kernel_size_2_bits),
+    Add#(kernel_size, 0, 3),
+    PrimUpdateable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(32))))
+  );
+// ...
+endmodule
+```
+
+其中，
+
+```bsv
+    // 2D vectors required
+    PrimSelectable#(in, Vector::Vector#(input_lines, Int#(32))),
+    PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Int#(32)))),
+```
+
+这一部分规定了输出的维度也需要是 2D。
+
+```bsv
+  rule set_data_in;
+    data_in <= fifo_in.first;
+  endrule
+
+  Wire#(Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits)))) cols <- mkWire;
+  rule bind_cols;
+    Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
+    for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
+      for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
+        cols_[i][j] = {
+          pack(data_in[i][j]),
+          pack(data_in[i][j + 1]),
+          pack(data_in[i][j + 2]),
+          pack(data_in[i + 1][j]),
+          pack(data_in[i + 1][j + 1]),
+          pack(data_in[i + 1][j + 2]),
+          pack(data_in[i + 2][j]),
+          pack(data_in[i + 2][j + 1]),
+          pack(data_in[i + 2][j + 2])
+        };
+      end
+    end
+    cols <= cols_;
+  endrule
+```
+
+这部分在规定 `kernel_size == 3` 的情况下，将 $28\times 28$ 的二维图像散列到 $26\times 26\times 3\times 3$ 的小区域序列中，以便后续计算中卷积核（权重）直接与 `col` 部分相乘。
+
+但是，由于图像位数和列数等过宽，超过了 Bluespec 编译器的处理能力，它在有限的时间内并不能将这一 `img2col` 逻辑转换到硬件。所以后续的计算等暂未进行。编译过程：
+
+```shell
+➜ chiro@chiro-pc  ~/programs/bsv-cnn git:(master) ✗ make verilog-CNN
+ROOT=/home/chiro/programs/bsv-cnn /home/chiro/programs/bsv-cnn/bsvbuild.sh -v mkTb CNN.bsv 10000000
+top module: mkTb
+top file  : CNN.bsv
+print simulation log to: /dev/stdout
+
+// 已经尽可能延长可计算时间，增大栈空间
+bsc +RTS -Ksize -RTS -steps-max-intervals 10000000 -verilog -g mkTb -u CNN.bsv 
+checking package dependencies
+compiling CNN.bsv
+code generation for mkTb starts
+Warning: "Prelude.bs", line 584, column 27: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `Prelude.PrimIndex~Prelude.Integer~32'. The current number of steps is
+  100000. Next warning at 200000 steps. Elaboration terminates at
+  1000000000000 steps.
+  During elaboration of the body of rule `bind_cols' at "Layers.bsv", line
+  211, column 8.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+Warning: "Prelude.bs", line 1329, column 9: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `Prelude.Ord~Prelude.Integer'. The current number of steps is 200000. Next
+  warning at 300000 steps. Elaboration terminates at 1000000000000 steps.
+  During elaboration of `tmp' at "Layers.bsv", line 233, column 13.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+Warning: "Prelude.bs", line 3090, column 0: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `primFix'. The current number of steps is 300000. Next warning at 400000
+  steps. Elaboration terminates at 1000000000000 steps.
+  During elaboration of `tmp' at "Layers.bsv", line 233, column 13.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+Warning: "Prelude.bs", line 3090, column 0: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `primFix'. The current number of steps is 400000. Next warning at 500000
+  steps. Elaboration terminates at 1000000000000 steps.
+  During elaboration of the body of rule `start' at "Layers.bsv", line 235,
+  column 8.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+Warning: "Array.bsv", line 208, column 23: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `primExtract'. The current number of steps is 500000. Next warning at 600000
+  steps. Elaboration terminates at 1000000000000 steps.
+  During elaboration of the body of rule `start' at "Layers.bsv", line 235,
+  column 8.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+Warning: "Prelude.bs", line 421, column 6: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `Prelude.Ord~Prelude.Integer'. The current number of steps is 600000. Next
+  warning at 700000 steps. Elaboration terminates at 1000000000000 steps.
+  During elaboration of the body of rule `start' at "Layers.bsv", line 235,
+  column 8.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+Warning: "Prelude.bs", line 1329, column 9: (G0024)
+  The function unfolding steps interval has been exceeded when unfolding
+  `Prelude.Ord~Prelude.Integer'. The current number of steps is 700000. Next
+  warning at 800000 steps. Elaboration terminates at 1000000000000 steps.
+  During elaboration of the body of rule `acc' at "Layers.bsv", line 243,
+  column 8.
+  During elaboration of `conv1' at "CNN.bsv", line 9, column 92.
+  During elaboration of `mkTb' at "CNN.bsv", line 7, column 8.
+
+// 之后过程无法结束
+```
+
+在后续会继续完善 2D 的卷积层。
+
+**整体网络连接**
+
+有了上述代码结构，我们可以很方便地定义一个神经网络的各层：
+
+```bsv
+Layer#(Vector#(784, Int#(32)), Vector#(32, Int#(32))) fc1 <- mkFCLayer("fc1");
+// 可选的 ReLU，与训练一致
+// Layer#(Vector#(32, Int#(32)), Vector#(32, Int#(32))) relu1 <- mkReluLayer;
+Layer#(Vector#(32, Int#(32)), Vector#(10, Int#(32))) fc2 <- mkFCLayer("fc2");
+Layer#(Vector#(10, Int#(32)), Int#(32)) softmax <- mkSoftmaxLayer;
+```
+
+然后再通过 FIFO 进行互相连接：
+
+```bsv
+rule put_data;
+  let d <- input_data.get;
+  Tuple2#(Int#(32), Vector::Vector#(784, Int#(32))) d_pack = unpack(d);
+  match {.target, .data} = d_pack;
+  let real_target = target >> q_bits();
+  fc1.put(data);
+  targets.enq(real_target);
+endrule
+
+// rule put_data_relu1;
+//   let out <- fc1.get;
+//   relu1.put(out);
+// endrule
+
+rule put_data_fc2;
+  let out <- fc1.get;
+  fc2.put(out);
+endrule
+
+rule put_data_softmax;
+  let out <- fc2.get;
+  softmax.put(out);
+endrule
+
+rule get_data_softmax;
+  Int#(32) real_data <- softmax.get;
+  Int#(32) target = targets.first;
+  targets.deq;
+  $write("[cnt=%x] Got target: %d, pred: %d, ", cnt, target, real_data);
+  if (real_data == target) begin
+    $display("correct");
+    correct <= correct + 1;
+  end else begin
+    $display("wrong");
+  end
+  total <= total + 1;
+endrule
+```
+
+通过不同 FIFO 的缓冲，我们构建起了一个流水线结构的推理模型。实际延迟由计算时间最长的一层决定。
+
+在本例子中，一次计算时长为 784 + 1 + 32 + 1 + 1 = 819 周期，如果在 50Mhz 的外设主频下运行，可以在 17us 内得出推理结果。
 
 ### 软件部分
 
+软件部分由于进度、硬件等原因暂时未实现，以下仅讨论设想中的实现方式和原理。
+
+在嵌入式系统上较为常见的计算机指令集架构有 ARM、RISC-V、C-Sky 等，大多数采用的 IO 访问方式都是地址总线空间映射，即将一个设备的控制寄存器、数据空间等映射到总线上的一段地址空间内，以总线对应地址读写的方式对其进行管理访问。本项目设计中也将把这个“神经网络计算 IP 模块”映射到总线地址空间中。
+
+嵌入式系统中常见的片内总线有 AXI、APB、PCIe 等，本项目设计中预期使用 AXI 总线对其进行访问和控制。
+
+设计本模块的交互控制寄存器接口如下：
+
+| 说明         | 起始地址   | 长度  | 权限 |
+| ------------ | ---------- | ----- | ---- |
+| 输入数据     | 0x1f001000 | 0xb60 | 写   |
+| 设置目的地址 | 0x1f002000 | 0x8   | 写   |
+| 开始计算     | 0x1f002004 | 0x1   | 写   |
+
+由于使用了 DMA 方式获取数据，还需要一条连接到 CPU 或中断控制器的中断信号线。
+
+大致流程：
+
+```c
+int32_t input[28][28];
+int32_t output;
+
+/// 读取摄像头数据，并进行一定的预处理，写入 input[][]
+memcpy(0x1f001000, input, sizeof(input));
+*(uint64_t*)(0x1f002000) = &output;
+*(uint8_t*)(0x1f002004) = 1;
+/// 设置中断，并等待中断触发返回
+
+printf("output is %d\n", output);
+```
+
 ## 结果呈现
 
+由于当前仅有仿真环境，所以仅进行了仿真环境中的实验。
+
+```shell
+➜ chiro@chiro-pc  ~/programs/bsv-cnn git:(master) ✗ make FC         
+ROOT=/home/chiro/programs/bsv-cnn /home/chiro/programs/bsv-cnn/bsvbuild.sh -bs mkTb FC.bsv 10000000
+top module: mkTb
+top file  : FC.bsv
+print simulation log to: /dev/stdout
+
+maximum simulation time argument: -m 10000000
+
+bsc +RTS -Ksize -RTS -steps-max-intervals 10000000 -sim -g mkTb -u FC.bsv 
+checking package dependencies
+compiling FC.bsv
+code generation for mkTb starts
+Elaborated module file created: mkTb.ba
+All packages are up to date.
+bsc +RTS -Ksize -RTS -steps-max-intervals 10000000 -sim -e mkTb -o sim.out 
+
+/// 输出
+
+[cnt=00046865] Got target:           2, pred:           8, wrong
+[cnt=00046b78] Got target:           9, pred:           0, wrong
+[cnt=00046e8b] Got target:           0, pred:           2, wrong
+[cnt=0004719e] Got target:           0, pred:           0, correct
+[cnt=000474b1] Got target:           8, pred:           2, wrong
+[cnt=000477c4] Got target:           0, pred:           0, correct
+[cnt=00047ad7] Got target:           0, pred:           6, wrong
+[cnt=00047dea] Got target:           5, pred:           2, wrong
+[cnt=000480fd] Got target:           9, pred:           2, wrong
+[cnt=00048410] Got target:           1, pred:           2, wrong
+[cnt=00048723] Got target:           3, pred:           4, wrong
+[cnt=00048a36] Got target:           0, pred:           0, correct
+[cnt=00048d49] Got target:           9, pred:           2, wrong
+[cnt=0004905c] Got target:           8, pred:           9, wrong
+[cnt=0004936f] Got target:           8, pred:           2, wrong
+Stopping, total:         381, correct:          78, accuracy:          20 %
+```
+
+`make FC` 开始仿真测试，读取测试集并逐个测试输出，记录正确的值。
+
+由于实现上的问题，或是精度上的问题，硬件上全连接层尚且存在问题，得到的结果明显是有问题的。后续会进一步改进。
+
 ## 嵌入式系统总结
+
+作为一门偏“硬”的课程，《嵌入式计算》的课程内容量大，对于基础知识的要求也高。在本学期的学习中，我对于嵌入式系统的相关知识有了一些了解。非常感谢老师（和助教们）的付出。没有你们就没有这门课程，也就没有我对嵌入式系统的更深入的了解。愿这门课程越开越好，也希望更多同学来选修学习。

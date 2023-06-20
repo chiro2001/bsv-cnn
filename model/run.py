@@ -253,5 +253,5 @@ def dump_test_set():
 if __name__ == '__main__':
   # test_floats()
   # dump_test_set()
-  # fc()
-  cnn()
+  fc()
+  # cnn()

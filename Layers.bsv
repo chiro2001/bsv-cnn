@@ -127,7 +127,6 @@ module mkSoftmaxLayer(Layer#(in, out))
     PrimSelectable#(in, Int#(32)),
     Bits#(out, output_bits),
     PrimIndex#(out, a__)
-    // Log#(input_size, output_bits)
   );
 
   FIFO#(out) fifo_out <- mkFIFO1;
@@ -135,11 +134,8 @@ module mkSoftmaxLayer(Layer#(in, out))
   method Action put(in x);
     out y = unpack('0);
     // just `hard' max
-    for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
-      // $write("%d ", x[i]);
+    for (Integer i = 0; i < valueOf(input_size); i = i + 1)
       if (x[i] > x[y]) y = fromInteger(i);
-    end
-    // $display("selected %x, %d", y, x[y]);
     fifo_out.enq(y);
   endmethod
 
