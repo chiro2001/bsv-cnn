@@ -61,6 +61,7 @@ def float2fix(float_num: float, decimal_bit: int) -> int:
   fix_num = int(float_num * (2 ** decimal_bit))
   return fix_num
 
+# 定点数转换为浮点数
 def fix2float(fix_num: int, decimal_bit: int) -> float:
   float_num = fix_num * 1.0 / (2 ** decimal_bit)
   return float_num
@@ -251,6 +252,6 @@ def dump_test_set():
 
 if __name__ == '__main__':
   # test_floats()
-  dump_test_set()
-  fc()
-  # cnn()
+  # dump_test_set()
+  # fc()
+  cnn()

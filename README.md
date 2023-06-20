@@ -1,6 +1,8 @@
 # bsv-cnn
 Bluespec-based implementation of CNN networks on FPGAs
 
+[嵌入式课程报告](docs/embsys.md)
+
 ## Roadmap
 
 - [ ] Bluespec language learning
