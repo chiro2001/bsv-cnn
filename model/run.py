@@ -64,6 +64,7 @@ def write_hex(data, path):
       f.write("{:02X}\n".format(data[i]))
 
 def write_hex_2d(data, path):
+  print('write_hex_2d: data shape', data.shape)
   data = data.reshape([data.shape[0], -1])
   with open(path, "w") as f:
     for i in range(data.shape[0]):
@@ -141,14 +142,16 @@ def dump_binary_hex(model):
   for k in data:
     save_path = DATA_PATH + model.name + '-' + k + ".bin"
     array = data[k].numpy()
-    array.astype(np.float32).tofile(save_path)
+    # array.astype(np.float32).tofile(save_path)
     save_path_int8 = DATA_PATH + model.name + '-' + k + ".hex"
     array_uint8 = np.array([float2fix(x, 6) for x in array.flatten()], dtype="uint8")
     # array_int8.tofile(save_path_int8)
     if len(array.shape) == 1:
       write_hex(array_uint8, save_path_int8)
-    else:
+    elif len(array.shape) == 2:
       write_hex_2d(array_uint8.reshape(array.shape).T, save_path_int8)
+    else:
+      write_hex_2d(array_uint8.reshape(array.shape), save_path_int8)
     print(model.name, k, data[k].shape, "max", array.max(), "min", array.min(), "int8 max", array_uint8.max(), "int8 min", array_uint8.min(), save_path)
     array_restore = np.array([fix2float(x, 6) for x in np.array(array_uint8, dtype="int8").flatten()]).astype(np.float32).reshape(array.shape)
     data_new[k] = torch.from_numpy(array_restore)
@@ -204,4 +207,4 @@ def test_floats():
 if __name__ == '__main__':
   # test_floats()
   fc()
-  # cnn()
+  cnn()

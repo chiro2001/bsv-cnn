@@ -169,7 +169,9 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     PrimSelectable#(in, Vector::Vector#(input_lines, Int#(8))),
     PrimSelectable#(out, Vector::Vector#(output_lines, Int#(8))),
     Add#(output_lines, kernel_size, TAdd#(input_lines, 1)),
-    Mul#(kernel_size, kernel_size, kernel_size_2)
+    Mul#(kernel_size, kernel_size, kernel_size_2),
+    Mul#(kernel_size_2, 8, kernel_size_2_bits),
+    Add#(kernel_size, 0, 3)
   );
 
   FIFOF#(in) fifo_in <- mkFIFOF1;
@@ -183,28 +185,63 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     data_in <= fifo_in.first;
   endrule
 
-  Wire#(Vector#(output_size, Vector#(kernel_size_2, Int#(8)))) cols <- 
+  // Wire#(Vector#(output_size, Bit#(kernel_size_2_bits))) cols <- 
+  Wire#(Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits)))) cols <-
     // mkDWire(unpack('0));
     mkWire;
 
   rule bind_cols;
-    Vector#(output_size, Vector#(kernel_size_2, Int#(8))) cols_ = unpack(0);
-    for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-      for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-        let idx = (i * valueOf(output_lines)) + j;
-        for (Integer a = 0; a < valueOf(kernel_size); a = a + 1) begin
-          for (Integer b = 0; b < valueOf(kernel_size); b = b + 1) begin
-            let k_idx = (a * valueOf(kernel_size)) + b;
-            cols_[idx][k_idx] = data_in[i + a][j + b];
-          end
-        end
-      end
-    end
-    // for (Integer i = 0; i < valueOf(output_size); i = i + 1) begin
-    //   for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
-    //     cols_[i][k] = data_in[i / valueOf(output_lines) + k / valueOf(kernel_size)][i % valueOf(output_lines) + k % valueOf(kernel_size)];
+    // Vector#(output_size, Vector#(kernel_size_2, Int#(8))) cols_ = unpack(0);
+    // for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
+    //   for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
+    //     let idx = (i * valueOf(output_lines)) + j;
+    //     for (Integer a = 0; a < valueOf(kernel_size); a = a + 1) begin
+    //       for (Integer b = 0; b < valueOf(kernel_size); b = b + 1) begin
+    //         let k_idx = (a * valueOf(kernel_size)) + b;
+    //         cols_[idx][k_idx] = data_in[i + a][j + b];
+    //       end
+    //     end
     //   end
     // end
+    // Wire#(Vector#(output_size, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
+    // Vector#(output_size, Bit#(kernel_size_2_bits)) cols_;
+    Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
+    // for (Integer i = 0; i < valueOf(output_size); i = i + 1) begin
+    //   // for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
+    //   //   cols_[i][k] = data_in[i / valueOf(output_lines) + k / valueOf(kernel_size)][i % valueOf(output_lines) + k % valueOf(kernel_size)];
+    //   // end
+    //   cols_[i] = pack({
+    //     pack(data_in[i / valueOf(output_lines)][i % valueOf(output_lines)]), 
+    //     pack(data_in[i / valueOf(output_lines)][i % valueOf(output_lines) + 1]), 
+    //     pack(data_in[i / valueOf(output_lines)][i % valueOf(output_lines) + 2]), 
+    //     pack(data_in[i / valueOf(output_lines) + 1][i % valueOf(output_lines)]), 
+    //     pack(data_in[i / valueOf(output_lines) + 1][i % valueOf(output_lines) + 1]),
+    //     pack(data_in[i / valueOf(output_lines) + 1][i % valueOf(output_lines) + 2]),
+    //     pack(data_in[i / valueOf(output_lines) + 2][i % valueOf(output_lines)]), 
+    //     pack(data_in[i / valueOf(output_lines) + 2][i % valueOf(output_lines) + 1]),
+    //     pack(data_in[i / valueOf(output_lines) + 2][i % valueOf(output_lines) + 2])
+    //   });
+    // end
+    for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
+      for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
+        // cols_[i][j] = {
+        //   pack(data_in[i])[j*8:(j + 3)*8], 
+        //   pack(data_in[i + 1])[j*8:(j + 3)*8], 
+        //   pack(data_in[i + 2])[j*8:(j + 3)*8]
+        // };
+        cols_[i][j] = {
+          pack(data_in[i][j]),
+          pack(data_in[i][j + 1]),
+          pack(data_in[i][j + 2]),
+          pack(data_in[i + 1][j]),
+          pack(data_in[i + 1][j + 1]),
+          pack(data_in[i + 1][j + 2]),
+          pack(data_in[i + 2][j]),
+          pack(data_in[i + 2][j + 1]),
+          pack(data_in[i + 2][j + 2])
+        };
+      end
+    end
     cols <= cols_;
   endrule
 

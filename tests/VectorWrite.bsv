@@ -10,6 +10,8 @@ rule test;
     v[i] = fromInteger(i + 1) + vec_in_reg[i];
   end
   vec_in_reg <= v;
+  let bits = pack(v);
+  // let slice = unpack(v)[3:0];
 endrule
 
 endmodule
