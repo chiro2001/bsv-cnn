@@ -77,7 +77,7 @@ module mkTb();
     $display("bias = %d", bdata);
     for (Integer i = 0; i < 32; i = i + 1) begin
       Bit#(16) wdata <- weights[i].portA.response.get();
-      Int#(16) d = unpack(wdata);
+      Int#(32) d = unpack(wdata);
       $write("%d ", d);
     end
     $display("");

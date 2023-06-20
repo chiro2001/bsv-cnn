@@ -196,10 +196,10 @@ def dump_binary_hex(model):
 def run_model(model, model_path: str = ""):
   set_seed(RANDOM_SEED)
   summary(model, (1, 28, 28))
-  for epoch in range(epochs):
-    if not MODEL_CACHE or not os.path.exists(model_path):
+  if not MODEL_CACHE or not os.path.exists(model_path):
+    for epoch in range(epochs):
       train(model, device, get_optimizer(model), epoch)
-    test(model, device)
+      test(model, device)
   # save model
   if len(model_path) > 0:
     torch.save(model.state_dict(), model_path)
@@ -235,16 +235,19 @@ def test_floats():
   print(num * num2, f, f2, fl * fl2)
 
 def dump_test_set():
+  lst = []
   for data, target in test_loader:
     data, target = data.to(device), target.to(device)
-    data, target = data.numpy(), target.numpy()
-    data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype="u" + Q_TYPE).reshape(data.shape)
-    target = np.array([float2fix(x, Q_BITS) for x in target.flatten()], dtype="u" + Q_TYPE)
-    print('data', data.shape, 'target', target.shape)
-    path = DATA_PATH + "test_input"
-    write_hex_2d(data, path + ".data" + ".hex")
-    write_hex(target, path + ".target" + ".hex")
-    break
+    lst.append((data, target))
+  random.shuffle(lst)
+  data, target = lst[0]
+  data, target = data.numpy(), target.numpy()
+  data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype="u" + Q_TYPE).reshape(data.shape)
+  target = np.array([float2fix(x, Q_BITS) for x in target.flatten()], dtype="u" + Q_TYPE)
+  print('data', data.shape, 'target', target.shape)
+  path = DATA_PATH + "test_input"
+  write_hex_2d(data, path + ".data" + ".hex")
+  write_hex(target, path + ".target" + ".hex")
 
 if __name__ == '__main__':
   # test_floats()

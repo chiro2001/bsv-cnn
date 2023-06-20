@@ -1,15 +1,15 @@
 // import fc::*;
 import Vector::*;
 
-function Vector#(2, Int#(16)) get_test_vector();
-  Vector#(2, Int#(16)) vec;
+function Vector#(2, Int#(32)) get_test_vector();
+  Vector#(2, Int#(32)) vec;
   vec[0] = 1;
   vec[1] = 2;
   return vec;
 endfunction
 
-function Vector#(2, Vector#(2, Int#(16))) get_test_vector2();
-  Vector#(2, Vector#(2, Int#(16))) vec;
+function Vector#(2, Vector#(2, Int#(32))) get_test_vector2();
+  Vector#(2, Vector#(2, Int#(32))) vec;
   vec[0][0] = 1;
   vec[0][1] = 2;
   vec[1][0] = 3;
@@ -19,8 +19,8 @@ endfunction
 
 module mkTb();
 
-// function Int#(16)[][] get_test_array();
-//   Int#(16) arr[2][2];
+// function Int#(32)[][] get_test_array();
+//   Int#(32) arr[2][2];
 //   arr[0][0] = 1;
 //   arr[0][1] = 4;
 //   arr[1][0] = 5;

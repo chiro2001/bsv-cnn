@@ -128,8 +128,8 @@ module mkTestData(TestData_ifc#(td, width))
     allowWriteResponseBypass:False, 
     loadFormat: tagged Hex target_path
   });
-  // FIFOF#(Tuple2#(td, Vector#(width, Vector#(width, td)))) fifo <- mkFIFOF1;
-  FIFOF#(Bit#(tot_sz)) fifo <- mkFIFOF1;
+  // FIFOF#(Tuple2#(td, Vector#(width, Vector#(width, td)))) fifo <- mkFIFOF;
+  FIFOF#(Bit#(tot_sz)) fifo <- mkFIFOF;
   // Reg#(Bit#(10)) index <- mkReg('1);
   Reg#(Bit#(10)) index <- mkReg(0);
 
