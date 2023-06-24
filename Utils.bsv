@@ -28,3 +28,8 @@ endfunction
 // function Integer q_bits();
 //   return 20;
 // endfunction
+
+function Vector#(m, td) flatten(Vector#(n1, Vector#(n2, td)) x)
+    provisos (Mul#(n1, n2, m), Bits#(td, tdSz));
+  return unpack(pack(x));
+endfunction

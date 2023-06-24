@@ -41,10 +41,9 @@ endrule
 
 rule put_data;
   let d <- input_data.get;
-  Tuple2#(ElementType, Vector::Vector#(784, ElementType)) d_pack = unpack(d);
-  match {.target, .data} = d_pack;
+  match {.target, .data} = d;
   let target_int = elementToInt(target);
-  fc1.put(data);
+  fc1.put(flatten(data));
   ResultType t = truncate(pack(target_int));
   // $display("[cnt=%x] Put data: %d (%x)", cnt, t, target_int);
   targets.enq(t);

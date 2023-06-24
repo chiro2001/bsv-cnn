@@ -83,14 +83,6 @@ module mkLayerData#(parameter String model_name, parameter String layer_name)(La
     });
   endrule
 
-  // rule inc_index (!weightsDoneBool);
-  //   index <= index + 1;
-  // endrule
-
-  // rule inc_index_bias (!biasDoneBool);
-  //   index_bias <= index_bias + 1;
-  // endrule
-
   method ActionValue#(Vector#(lines, td)) getWeights();
     Bit#(lines_bits) ret <- weights.portA.response.get;
     return unpack(ret);
@@ -123,24 +115,19 @@ module mkLayerData#(parameter String model_name, parameter String layer_name)(La
 endmodule
 
 interface TestData_ifc#(type td, type width);
-  // method ActionValue#(Tuple2#(td, Vector#(width, Vector#(width, td)))) get;
-  method ActionValue#(Bit#(SizeOf#(Tuple2#(td, Vector#(width, Vector#(width, td)))))) get;
-  // method ActionValue#(Bits#(TAdd#(1, TMul#(width, TMul#(width, SizeOf#(td)))))) get;
+  method ActionValue#(Tuple2#(td, Vector#(width, Vector#(width, td)))) get;
 endinterface
 
 module mkTestData(TestData_ifc#(td, width))
   provisos (
     Bits#(td, sz), 
     Literal#(td),
-    // Literal#(Vector::Vector#(width, Vector::Vector#(width, td))),
-    // Literal#(Tuple2#(td, Vector::Vector#(width, Vector::Vector#(width, td)))),
     Bits#(Vector::Vector#(width, Vector::Vector#(width, td)), data_sz),
-    Bits#(Tuple2#(td, Vector::Vector#(width, Vector::Vector#(width, td))), tot_sz)
+    Add#(data_sz, sz, tot_sz)
   );
   let data_path = "data/test_input.data.hex";
   let target_path = "data/test_input.target.hex";
   let size = valueOf(TEST_DATA_SZ);
-  // BRAM1Port#(Bit#(10), Vector#(width, Vector#(width, td))) data
   BRAM1Port#(Bit#(10), Bit#(data_sz)) data
       <- mkBRAM1Server(BRAM_Configure{
     memorySize: size, 
@@ -156,12 +143,9 @@ module mkTestData(TestData_ifc#(td, width))
     allowWriteResponseBypass:False, 
     loadFormat: tagged Hex target_path
   });
-  // FIFOF#(Tuple2#(td, Vector#(width, Vector#(width, td)))) fifo <- mkFIFOF;
-  FIFOF#(Bit#(tot_sz)) fifo <- mkFIFOF;
-  // Reg#(Bit#(10)) index <- mkReg('1);
+  FIFOF#(Tuple2#(td, Vector::Vector#(width, Vector::Vector#(width, td)))) fifo <- mkFIFOF;
   Reg#(Bit#(10)) index <- mkReg(0);
 
-  // rule req_data (index != '1);
   rule req_data;
     data.portA.request.put(BRAMRequest{
       write: False, 
@@ -175,20 +159,17 @@ module mkTestData(TestData_ifc#(td, width))
       address: index, 
       datain: 0
     });
-    // $display("req_data: index=%x", index);
   endrule
 
   rule insert_data;
     let d <- data.portA.response.get;
+    let data = unpack(d);
     let t <- target.portA.response.get;
-    // fifo.enq(tuple2(t, d));
-    // fifo.enq(pack(tuple2(t, d)));
-    // $display("insert test data, target is %x", t);
-    fifo.enq({t, d});
+    let target = unpack(t);
+    fifo.enq(tuple2(target, data));
   endrule
 
-  // method ActionValue#(Tuple2#(td, Vector#(width, Vector#(width, td)))) get;
-  method ActionValue#(Bit#(tot_sz)) get;
+  method ActionValue#(Tuple2#(td, Vector#(width, Vector#(width, td)))) get;
     fifo.deq;
     index <= index + 1;
     return fifo.first;
