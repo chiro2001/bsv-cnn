@@ -1,11 +1,13 @@
-// import Float32::*;
+import FixedPoint::*;
 
 module mkTb();
 
-  // FpPairIfc#(32) mult <- mkFpMult32;
+  FixedPoint#(8, 8) a = 4.0;
+  FixedPoint#(8, 8) b = 3.5;
 
   rule test_mult;
-    $display("no floating point support yet");
+    let res = a * b;
+    $display("a * b = ", fshow(res));
     $finish;
   endrule
 endmodule

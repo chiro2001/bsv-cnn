@@ -18,7 +18,8 @@ TestData_ifc#(ElementType, 28) input_data <- mkTestData;
 FIFOF#(ResultType) targets <- mkSizedFIFOF(10);
 
 Reg#(int) cnt <- mkReg(0);
-Integer max_cnt = 300000;
+Integer max_cnt = 10000;
+// Integer max_cnt = 3000;
 
 Reg#(int) total <- mkReg(0);
 Reg#(int) correct <- mkReg(0);
@@ -40,21 +41,32 @@ rule put_data;
   let d <- input_data.get;
   Tuple2#(ElementType, Vector::Vector#(784, ElementType)) d_pack = unpack(d);
   match {.target, .data} = d_pack;
-  let target_int = fxptGetInt(target);
+  let target_int = elementToInt(target);
   fc1.put(data);
-  ResultType t = truncate(pack(target_int));
-  // $display("[cnt=%x] Put data: %d", cnt, t);
+  ResultType t = truncate(pack(target_int >> valueOf(Q_BITS)));
+  // $display("[cnt=%x] Put data: %d (%x)", cnt, t, target_int);
   targets.enq(t);
 endrule
 
 rule put_data_fc2;
   let out <- fc1.get;
+  // for (Integer i = 0; i < 4; i = i + 1) begin
+  //   Int#(SizeOf#(ElementType)) intVal = unpack(pack(out[i]));
+  //   $write("%d", intVal);
+  // end
+  // $display("");
   fc2.put(out);
 endrule
 
 rule put_data_softmax;
   let out <- fc2.get;
+  // $display("[cnt=%x] Got data: %x", cnt, pack(out));
   softmax.put(out);
+  // for (Integer i = 0; i < 10; i = i + 1) begin
+  //   Int#(SizeOf#(ElementType)) intVal = unpack(pack(out[i]));
+  //   $write("%d", intVal);
+  // end
+  // $display("");
 endrule
 
 rule get_data_softmax;

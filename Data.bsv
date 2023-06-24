@@ -2,6 +2,7 @@ import Vector::*;
 import BRAM::*;
 import FIFOF::*;
 import Utils::*;
+import Config::*;
 
 // try to use typeclass to implement Literal#(Vector#(n, td)), but failed
 
@@ -138,7 +139,7 @@ module mkTestData(TestData_ifc#(td, width))
   );
   let data_path = "data/test_input.data.hex";
   let target_path = "data/test_input.target.hex";
-  let size = 1000;
+  let size = valueOf(TEST_DATA_SZ);
   // BRAM1Port#(Bit#(10), Vector#(width, Vector#(width, td))) data
   BRAM1Port#(Bit#(10), Bit#(data_sz)) data
       <- mkBRAM1Server(BRAM_Configure{

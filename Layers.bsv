@@ -1,6 +1,7 @@
 import FIFOF::*;
 import FIFO::*;
 import Vector::*;
+import FixedPoint::*;
 
 import Data::*;
 import Utils::*;
@@ -25,52 +26,65 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     PrimSelectable#(in, ElementType),
     PrimSelectable#(out, ElementType),
     PrimWriteable#(Reg#(out), ElementType),
+    PrimWriteable#(Reg#(Vector#(lines, ElementTmpType)), ElementTmpType),
     Add#(TLog#(lines), a__, TLog#(depth))
   );
   LayerData_ifc#(ElementType, lines, depth) data <- mkLayerData("fc", layer_name);
   Reg#(Bool) done <- mkReg(True);
-  Reg#(out) tmp <- mkReg(unpack('0));
+  // Reg#(out) tmp <- mkReg(unpack('0));
+  Reg#(Vector#(lines, ElementTmpType)) tmp <- mkReg(unpack('0));
 
   FIFOF#(in) fifo_in <- mkFIFOF;
   FIFOF#(out) fifo_out <- mkFIFOF;
 
-  rule start (done && fifo_in.notEmpty && data.weightsDone() && data.biasDone());
+  rule start if (done && fifo_in.notEmpty && data.weightsDone() && data.biasDone());
     data.weightsStart();
     data.biasStart();
     done <= False;
     tmp <= unpack('0);
   endrule
 
-  rule acc_weights_bias (!done && !data.weightsDone() && !data.biasDone());
+  rule acc_weights_bias if (!done && !data.weightsDone() && !data.biasDone());
     let index = data.getWeightsIndex() - 1;
-    let index_bias = data.getBiasIndex() - 1;
+    // let index_bias = data.getBiasIndex() - 1;
     let weight <- data.getWeights();
     let top = fifo_in.first;
-    out t = tmp;
+    Vector#(lines, ElementTmpType) t = tmp;
     let bias <- data.getBias();
+    ElementTmpType bias_tmp = elementExtend(bias);
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      t[i] = tmp[i] + (top[index] * weight[i]) + (index == extend(index_bias) ? bias : 0);
+      ElementTmpType mul = elementMult(top[index], weight[i]);
+      t[i] = (index == 0 ? 0 : tmp[i]) + mul + (fromInteger(i) == index ? bias_tmp : 0);
     end
+    // if (index < 6 && layer_name == "fc1") begin
+    //   $display("[idx=%d] t[0] = %d, tmp[0] = %d", index, elementToInt(elementTruncate(t[0])), elementToInt(elementTruncate(tmp[0])));
+    // end
     tmp <= t;
     data.weightsInc();
     data.biasInc();
   endrule
 
-  rule acc_weights_only (!done && !data.weightsDone() && data.biasDone());
+  rule acc_weights_only if (!done && !data.weightsDone() && data.biasDone());
     let index = data.getWeightsIndex() - 1;
     let weight <- data.getWeights();
     let top = fifo_in.first;
-    out t = tmp;
+    Vector#(lines, ElementTmpType) t = tmp;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      t[i] = tmp[i] + (top[index] * weight[i]);
+      ElementTmpType mul = elementMult(top[index], weight[i]);
+      t[i] = (index == 0 ? 0 : tmp[i]) + mul;
     end
     tmp <= t;
     data.weightsInc();
   endrule
 
-  rule set_done (!done && data.weightsDone() && data.biasDone());
+  rule set_done if (!done && data.weightsDone() && data.biasDone());
     done <= True;
-    fifo_out.enq(tmp);
+    // fifo_out.enq(tmp);
+    out o;
+    for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
+      o[i] = elementTruncate(tmp[i]);
+    end
+    fifo_out.enq(o);
     fifo_in.deq;
     tmp <= unpack('0);
   endrule
@@ -98,9 +112,21 @@ module mkSoftmaxLayer(Layer#(in, out))
 
   method Action put(in x);
     out y = unpack('0);
+    // for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
+    //   $write("%d ", elementToInt(x[i]));
+    // end
+    // $display("");
     // just `hard' max
-    for (Integer i = 0; i < valueOf(input_size); i = i + 1)
-      if (x[i] > x[y]) y = fromInteger(i);
+    for (Integer i = 1; i < valueOf(input_size); i = i + 1) begin
+      if (x[i] > x[y]) begin
+        // $write("max from %d ", y);
+        // $write(fshow(x[y]));
+        // $write(" to ");
+        // $write(fshow(x[i]));
+        // $display(" %d", i);
+        y = fromInteger(i);
+      end
+    end
     fifo_out.enq(y);
   endmethod
 

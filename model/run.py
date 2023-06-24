@@ -62,6 +62,7 @@ def manual_test(model, device):
   correct = 0
   count = 0
   dataset_use = train_loader
+  # dataset_use = test_loader
   with torch.no_grad():
     for data, target in dataset_use:
       data, target = data.to(device), target.to(device)
@@ -89,15 +90,28 @@ def write_hex(data, path):
       # print('fmt', fmt[:-1], 'd', d[:-1], 'data', data[i], 'int(data[i])', int(data[i]))
       f.write(d)
 
+
+# write_hex_2d_g = False
+
 def write_hex_2d(data, path):
+  # global write_hex_2d_g
   # print('write_hex_2d: data shape', data.shape)
   fmt = ("{:0" + str(int(Q_TYPE[3:]) // 4) + "X}")
   data = data.reshape([data.shape[0], -1])
   with open(path, "w") as f:
     for i in range(data.shape[0]):
       for j in range(data.shape[1]):
-        f.write(fmt.format(data[i][j]))
+        # f.write(fmt.format(data[i][j]))
+        # f.write(fmt.format(data[data.shape[0] - 1 - i][j]))
+        f.write(fmt.format(data[i][data.shape[1] - 1 - j]))
+        # if not write_hex_2d_g:
+        #   print(np.__dict__[Q_TYPE](data[i][j]), end='\t')
       f.write("\n")
+      # if not write_hex_2d_g:
+      #   print('')
+      #   write_hex_2d_g = True
+  # if not write_hex_2d_g:
+  #   write_hex_2d_g = True
 
 def dump_bsv(model, vector: bool = False):
   name = model.name.lower()
@@ -232,12 +246,15 @@ def test_floats():
 
 def dump_test_set():
   lst = []
-  for data, target in test_loader:
+  testset_use = train_loader
+  for data, target in testset_use:
     data, target = data.to(device), target.to(device)
     lst.append((data, target))
-  random.shuffle(lst)
+    break
+  # random.shuffle(lst)
   data, target = lst[0]
-  data, target = Q(data.to(torch.float32)), Q(target.to(torch.float32))
+  # data, target = Q(data.to(torch.float32)), Q(target.to(torch.float32))
+  data, target = data.to(torch.float32), target.to(torch.float32)
   data, target = data.numpy(), target.numpy()
   data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype="u" + Q_TYPE).reshape(data.shape)
   target = np.array([float2fix(x, Q_BITS) for x in target.flatten()], dtype="u" + Q_TYPE)
@@ -248,6 +265,6 @@ def dump_test_set():
 
 if __name__ == '__main__':
   # test_floats()
-  # dump_test_set()
+  dump_test_set()
   fc()
   # cnn()
