@@ -9,8 +9,8 @@ class FcNet(nn.Module):
   def __init__(self) -> None:
     super().__init__()
     self.name = "fc"
-    self.fc1 = nn.Linear(784, 32)
-    self.fc2 = nn.Linear(32, 10)
+    self.fc1 = nn.Linear(784, 64)
+    self.fc2 = nn.Linear(64, 10)
 
   def forward(self, x):
     x = torch.flatten(x, 1)

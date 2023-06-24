@@ -7,11 +7,13 @@ import Data::*;
 import Layers::*;
 import Config::*;
 
+typedef 64 FcParam;
+
 module mkTb();
 
-Layer#(Vector#(784, ElementType), Vector#(32, ElementType)) fc1 <- mkFCLayer("fc1");
+Layer#(Vector#(784, ElementType), Vector#(FcParam, ElementType)) fc1 <- mkFCLayer("fc1");
 // Layer#(Vector#(32, ElementType), Vector#(32, ElementType)) relu1 <- mkReluLayer;
-Layer#(Vector#(32, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc2");
+Layer#(Vector#(FcParam, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc2");
 Layer#(Vector#(10, ElementType), ResultType) softmax <- mkSoftmaxLayer;
 
 TestData_ifc#(ElementType, 28) input_data <- mkTestData;

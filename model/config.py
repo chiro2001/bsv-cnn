@@ -14,7 +14,7 @@ Q_TYPE = "int16"
 Q_BITS = 8
 
 # Q_TYPE = "int8"
-# Q_BITS = 2
+# Q_BITS = 4
 
 # Q_TYPE = "int32"
 # Q_BITS = 20
@@ -25,7 +25,7 @@ Q_BITS = 8
 MODEL_CACHE = True
 
 device = torch.device("cpu")
-epochs = 1
+epochs = 5
 
 def get_optimizer(model):
   return torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
