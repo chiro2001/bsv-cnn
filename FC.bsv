@@ -7,13 +7,13 @@ import Data::*;
 import Layers::*;
 import Config::*;
 
-typedef 64 FcParam;
+typedef 64 HiddenSize;
 
 module mkTb();
 
-Layer#(Vector#(784, ElementType), Vector#(FcParam, ElementType)) fc1 <- mkFCLayer("fc1");
-// Layer#(Vector#(32, ElementType), Vector#(32, ElementType)) relu1 <- mkReluLayer;
-Layer#(Vector#(FcParam, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc2");
+Layer#(Vector#(784, ElementType), Vector#(HiddenSize, ElementType)) fc1 <- mkFCLayer("fc1");
+Layer#(Vector#(HiddenSize, ElementType), Vector#(HiddenSize, ElementType)) relu1 <- mkReluLayer;
+Layer#(Vector#(HiddenSize, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc2");
 Layer#(Vector#(10, ElementType), ResultType) softmax <- mkSoftmaxLayer;
 
 TestData_ifc#(ElementType, 28) input_data <- mkTestData;
@@ -45,29 +45,22 @@ rule put_data;
   let target_int = elementToInt(target);
   fc1.put(flatten(data));
   ResultType t = truncate(pack(target_int));
-  // $display("[cnt=%x] Put data: %d (%x)", cnt, t, target_int);
   targets.enq(t);
 endrule
 
-rule put_data_fc2;
+rule put_data_relu1;
   let out <- fc1.get;
-  // for (Integer i = 0; i < 4; i = i + 1) begin
-  //   Int#(SizeOf#(ElementType)) intVal = unpack(pack(out[i]));
-  //   $write("%d", intVal);
-  // end
-  // $display("");
+  relu1.put(out);
+endrule
+
+rule put_data_fc2;
+  let out <- relu1.get;
   fc2.put(out);
 endrule
 
 rule put_data_softmax;
   let out <- fc2.get;
-  // $display("[cnt=%x] Got data: %x", cnt, pack(out));
   softmax.put(out);
-  // for (Integer i = 0; i < 10; i = i + 1) begin
-  //   Int#(SizeOf#(ElementType)) intVal = unpack(pack(out[i]));
-  //   $write("%d", intVal);
-  // end
-  // $display("");
 endrule
 
 rule get_data_softmax;

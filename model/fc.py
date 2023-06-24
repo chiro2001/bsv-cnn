@@ -17,7 +17,7 @@ class FcNet(nn.Module):
     x = Q(x)
     x = self.fc1(x)
     x = Q(x)
-    # x = F.relu(x)
+    x = F.relu(x)
     x = self.fc2(x)
     x = Q(x)
     output = F.log_softmax(x, dim=1)
@@ -28,6 +28,8 @@ class FcNet(nn.Module):
       return ((d * (2 ** n)).to(torch.__dict__[Q_TYPE]).to(torch.float32)) / (2 ** n)
     x = calc(x)
     x = torch.flatten(x, 1)
+    x = calc(x)
+    x = F.relu(x)
     x = calc(x)
     x = self.fc1(x)
     x = calc(x)
@@ -48,7 +50,7 @@ class FcNet(nn.Module):
       b = float2fixv(layer.bias.clone().detach().numpy(), Q_BITS, dtype=dtype)
       r0 = [dtype2(0) for _ in range(len(b))]
       for i in range(len(x0)):
-        t00 = r0[0]
+        # t00 = r0[0]
         for j in range(len(b)):
           mul_raw = dtype2(dtype2(x0[i]) * dtype2(w[j][i]))
           mul = dtype2(mul_raw >> Q_BITS)
@@ -64,6 +66,8 @@ class FcNet(nn.Module):
       return r0
     x = torch.flatten(x)
     x = calc_layer(self.fc1, x)
+    # x = F.relu(x)
+    x[x < 0] = 0
     # exit(1)
     # [print(f'{int(x[i]):10d}', end=' ') for i in range(4)]
     # print('')
