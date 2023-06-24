@@ -3,11 +3,27 @@ import BRAM::*;
 import FIFOF::*;
 import Utils::*;
 
+// try to use typeclass to implement Literal#(Vector#(n, td)), but failed
+
+// typedef struct {
+//   Vector#(n, td) v;
+// } LiteralVector#(numeric type n, type td) 
+//   deriving (Bits, Literal);
+
+// typeclass LiteralVector#(numeric type n, type td)
+//   provisos (Vector#(n, td), Bits#(td, tdSz), Bits#(LiteralVector#(n, td), TMul#(n, SizeOf#(td))), Literal#(td));
+//   function LiteralVector#(n, td) fromInteger(Integer x);
+//   function Bool inLiteralRange(LiteralVector#(n, td) target, Integer i);
+// endtypeclass
+
+
 interface LayerData_ifc#(type td, type lines, type depth);
-  method ActionValue#(Bit#(TMul#(lines, SizeOf#(td)))) getWeights();
+  method ActionValue#(Vector#(lines, td)) getWeights();
   method ActionValue#(td) getBias();
   method Action weightsStart();
   method Action biasStart();
+  method Action weightsInc();
+  method Action biasInc();
   method Bit#(TAdd#(TLog#(depth), 1)) getWeightsIndex();
   method Bit#(TAdd#(TLog#(lines), 1)) getBiasIndex();
   method Bool weightsDone();
@@ -66,15 +82,18 @@ module mkLayerData#(parameter String model_name, parameter String layer_name)(La
     });
   endrule
 
-  rule inc_index (!weightsDoneBool);
-    index <= index + 1;
-  endrule
+  // rule inc_index (!weightsDoneBool);
+  //   index <= index + 1;
+  // endrule
 
-  rule inc_index_bias (!biasDoneBool);
-    index_bias <= index_bias + 1;
-  endrule
+  // rule inc_index_bias (!biasDoneBool);
+  //   index_bias <= index_bias + 1;
+  // endrule
 
-  method getWeights = weights.portA.response.get;
+  method ActionValue#(Vector#(lines, td)) getWeights();
+    Bit#(lines_bits) ret <- weights.portA.response.get;
+    return unpack(ret);
+  endmethod
 
   method getBias = bias.portA.response.get;
 
@@ -91,6 +110,14 @@ module mkLayerData#(parameter String model_name, parameter String layer_name)(La
 
   method Bool weightsDone() = weightsDoneBool;
   method Bool biasDone() = biasDoneBool;
+
+  method Action weightsInc() if (!weightsDoneBool);
+    index <= index + 1;
+  endmethod
+
+  method Action biasInc() if (!biasDoneBool);
+    index_bias <= index_bias + 1;
+  endmethod
 
 endmodule
 

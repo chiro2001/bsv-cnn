@@ -13,7 +13,7 @@ fi
 
 # CUSTOMBSV="-p +:$ROOT/bluelib/src"
 # CUSTOMBSV="-p +:$ROOT/gen"
-CUSTOMBSV="+RTS -Ksize -RTS -steps-max-intervals 10000000"
+CUSTOMBSV="+RTS -Ksize -RTS -steps-max-intervals 10000000 -p +:$ROOT"
 
 alias echo="echo -e"
 

@@ -1,18 +1,21 @@
 import Vector::*;
 import FIFOF::*;
+import FixedPoint::*;
+
 import Utils::*;
 import Data::*;
 import Layers::*;
+import Config::*;
 
 module mkTb();
 
-Layer#(Vector#(784, Int#(32)), Vector#(32, Int#(32))) fc1 <- mkFCLayer("fc1");
-// Layer#(Vector#(32, Int#(32)), Vector#(32, Int#(32))) relu1 <- mkReluLayer;
-Layer#(Vector#(32, Int#(32)), Vector#(10, Int#(32))) fc2 <- mkFCLayer("fc2");
-Layer#(Vector#(10, Int#(32)), Int#(32)) softmax <- mkSoftmaxLayer;
+Layer#(Vector#(784, ElementType), Vector#(32, ElementType)) fc1 <- mkFCLayer("fc1");
+// Layer#(Vector#(32, ElementType), Vector#(32, ElementType)) relu1 <- mkReluLayer;
+Layer#(Vector#(32, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc2");
+Layer#(Vector#(10, ElementType), Bit#(4)) softmax <- mkSoftmaxLayer;
 
-TestData_ifc#(Int#(32), 28) input_data <- mkTestData;
-FIFOF#(Int#(32)) targets <- mkSizedFIFOF(3);
+TestData_ifc#(ElementType, 28) input_data <- mkTestData;
+FIFOF#(ElementType) targets <- mkSizedFIFOF(3);
 
 Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 300000;
@@ -38,12 +41,12 @@ rule put_data;
   // fc1.put(unpack('h2345678765));
   // match {.target, .data} <- input_data.get;
   let d <- input_data.get;
-  // Tuple2#(Int#(32), Vector::Vector#(28, Vector::Vector#(28, Int#(32)))) d_pack = unpack(d);
-  Tuple2#(Int#(32), Vector::Vector#(784, Int#(32))) d_pack = unpack(d);
+  // Tuple2#(ElementType, Vector::Vector#(28, Vector::Vector#(28, ElementType))) d_pack = unpack(d);
+  Tuple2#(ElementType, Vector::Vector#(784, ElementType)) d_pack = unpack(d);
   match {.target, .data} = d_pack;
-  let real_target = target >> q_bits();
+  // let real_target = target >> q_bits();
   fc1.put(data);
-  targets.enq(real_target);
+  targets.enq(target);
   // if (targets.notFull) begin
   //   $display("[cnt=%x] Putting target %d", cnt, real_target);
   // end
@@ -76,7 +79,7 @@ rule put_data_softmax;
 endrule
 
 // rule get_data_fc2;
-//   Vector#(10, Int#(32)) data <- fc2.get;
+//   Vector#(10, ElementType) data <- fc2.get;
 //   $write("[cnt=%x] Got fc2 data:", cnt);
 //   for (Integer i = 0; i < 10; i = i + 1) begin
 //     $write("[%d: %d], ", i, data[i]);
@@ -88,14 +91,17 @@ endrule
 rule get_data_softmax;
   // Bit#(4) data <- softmax.get;
   // Int#(4) data_idx = unpack(data);
-  // Int#(32) real_data = extend(data_idx);
-  Int#(32) real_data <- softmax.get;
-  Int#(32) target = targets.first;
+  // ElementType real_data = extend(data_idx);
+  let data <- softmax.get;
+  // ElementType real_data = fromInt(unpack(data));
+  Int#(4) int_data = unpack(data);
+  ElementType real_target = targets.first;
+  let int_target = fxptGetInt(real_target);
   targets.deq;
   // $display("[cnt=%x] Got softmax data: %d", cnt, data);
   // $finish(0);
-  $write("[cnt=%x] Got target: %d, pred: %d, ", cnt, target, real_data);
-  if (real_data == target) begin
+  $write("[cnt=%x] Got target: %d, pred: %d, ", cnt, int_target, int_data);
+  if (extend(int_data) == int_target) begin
     $display("correct");
     correct <= correct + 1;
   end else begin

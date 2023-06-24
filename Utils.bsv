@@ -25,6 +25,6 @@ function String numberToString(Integer i);
   return num;
 endfunction
 
-function Integer q_bits();
-  return 20;
-endfunction
+// function Integer q_bits();
+//   return 20;
+// endfunction

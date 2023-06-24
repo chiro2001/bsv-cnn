@@ -1,12 +1,16 @@
 import Vector::*;
 import FIFO::*;
+
 import Utils::*;
 import Data::*;
 import Layers::*;
 
 module mkTb();
 
-Layer#(Vector#(28, Vector#(28, Int#(32))), Vector#(8, Vector#(26, Vector#(26, Int#(32))))) conv1 <- mkConvLayer("conv1");
+Layer#(
+    Vector#(28, Vector#(28, ElementType)), 
+    Vector#(8, Vector#(26, Vector#(26, ElementType)))
+  ) conv1 <- mkConvLayer("conv1");
 
 Reg#(int) cnt <- mkReg(0);
 Integer max_cnt = 10000;
