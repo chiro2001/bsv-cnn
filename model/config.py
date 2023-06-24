@@ -10,14 +10,14 @@ LEARNING_RATE = 0.01
 # Q_TYPE = "int16"
 # Q_BITS = 8
 
-# Q_TYPE = "int16"
-# Q_BITS = 9
+Q_TYPE = "int16"
+Q_BITS = 8
 
 # Q_TYPE = "int8"
 # Q_BITS = 2
 
-Q_TYPE = "int32"
-Q_BITS = 20
+# Q_TYPE = "int32"
+# Q_BITS = 20
 
 # Q_TYPE = "int32"
 # Q_BITS = 12

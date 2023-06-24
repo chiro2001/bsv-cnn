@@ -68,8 +68,8 @@ class FcNet(nn.Module):
     # [print(f'{int(x[i]):10d}', end=' ') for i in range(4)]
     # print('')
     x = calc_layer(self.fc2, x)
-    [print(f'{int(xx):10d}', end=' ') for xx in x]
-    print('')
+    # [print(f'{int(xx):10d}', end=' ') for xx in x]
+    # print('')
     x = torch.tensor(fix2floatv(x, Q_BITS), dtype=torch.float32)
     output = F.log_softmax(x, dim=0)
     return output

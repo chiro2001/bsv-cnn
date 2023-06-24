@@ -18,7 +18,7 @@ TestData_ifc#(ElementType, 28) input_data <- mkTestData;
 FIFOF#(ResultType) targets <- mkSizedFIFOF(10);
 
 Reg#(int) cnt <- mkReg(0);
-Integer max_cnt = 10000;
+Integer max_cnt = 100000;
 // Integer max_cnt = 3000;
 
 Reg#(int) total <- mkReg(0);
@@ -43,7 +43,7 @@ rule put_data;
   match {.target, .data} = d_pack;
   let target_int = elementToInt(target);
   fc1.put(data);
-  ResultType t = truncate(pack(target_int >> valueOf(Q_BITS)));
+  ResultType t = truncate(pack(target_int));
   // $display("[cnt=%x] Put data: %d (%x)", cnt, t, target_int);
   targets.enq(t);
 endrule

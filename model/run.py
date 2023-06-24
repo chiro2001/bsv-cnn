@@ -221,7 +221,7 @@ def fc():
   model_path = "fc.pt"
   if MODEL_CACHE and os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path))
-  run_model(model, model_path=model_path, test_manual=True)
+  run_model(model, model_path=model_path, test_manual=False)
 
 def cnn():
   model = CNNNet().to(device)
@@ -246,7 +246,8 @@ def test_floats():
 
 def dump_test_set():
   lst = []
-  testset_use = train_loader
+  # testset_use = train_loader
+  testset_use = test_loader
   for data, target in testset_use:
     data, target = data.to(device), target.to(device)
     lst.append((data, target))

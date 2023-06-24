@@ -1,9 +1,13 @@
-typedef 20 Q_BITS;
-typedef 32 Q_WORD;
+// typedef 20 Q_BITS;
+// typedef 32 Q_WORD;
 
-typedef 64 TEST_DATA_SZ;
+typedef 8 Q_BITS;
+typedef 16 Q_WORD;
 
-// `define USE_FIXED_POINT
+// typedef 64 TEST_DATA_SZ;
+typedef 1000 TEST_DATA_SZ;
+
+`define USE_FIXED_POINT
 
 `ifdef USE_FIXED_POINT
 
@@ -46,7 +50,7 @@ function ElementType elementTruncate(ElementTmpType a);
 endfunction
 
 function Int#(Q_WORD) elementToInt(ElementType a);
-  return extend(a);
+  return extend(a >> valueOf(Q_BITS));
 endfunction
 
 `endif
