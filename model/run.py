@@ -4,6 +4,7 @@ from torchsummary import summary
 import random
 import os
 
+from utils import *
 from data_helper import *
 from config import *
 from fc import FcNet
@@ -56,15 +57,22 @@ def q_test(model, device):
 
   print('Test Q: Accuracy: {}/{} ({:.0f}%)\n'.format(correct, len(test_loader.dataset), 100. * correct / len(test_loader.dataset)))
 
-# 浮点数转换为定点数
-def float2fix(float_num: float, decimal_bit: int) -> int:
-  fix_num = int(float_num * (2 ** decimal_bit))
-  return fix_num
+def manual_test(model, device):
+  model.eval()
+  correct = 0
+  count = 0
+  dataset_use = train_loader
+  with torch.no_grad():
+    for data, target in dataset_use:
+      data, target = data.to(device), target.to(device)
+      output = model.manual_forward(data)
+      pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+      correct += pred.eq(target.view_as(pred)).sum().item()
+      count += len(output)
+      break
 
-# 定点数转换为浮点数
-def fix2float(fix_num: int, decimal_bit: int) -> float:
-  float_num = fix_num * 1.0 / (2 ** decimal_bit)
-  return float_num
+  # print('Test Manual: Accuracy: {}/{} ({:.0f}%)\n'.format(correct, len(dataset_use.dataset), 100. * correct / len(dataset_use.dataset)))
+  print('Test Manual: Accuracy: {}/{} ({:.0f}%)\n'.format(correct, count, 100. * correct / count))
 
 def set_seed(seed):
   torch.manual_seed(seed)
@@ -161,12 +169,9 @@ def dump_binary_hex(model):
   n = Q_BITS
   dtype = Q_TYPE
   for k in data:
-    array = data[k].numpy()
-    # save_path = DATA_PATH + model.name + '-' + k + ".bin"
-    # array.astype(np.float32).tofile(save_path)
+    array = Q(data[k]).numpy()
     save_path_hex = DATA_PATH + model.name + '-' + k + ".hex"
     array_uint = np.array([float2fix(x, n) for x in array.flatten()], dtype="u" + dtype)
-    # array_int8.tofile(save_path_int8)
     if len(array.shape) == 1:
       write_hex(array_uint, save_path_hex)
     elif len(array.shape) == 2:
@@ -177,24 +182,11 @@ def dump_binary_hex(model):
     array_restore = np.array([fix2float(x, n) for x in np.array(array_uint, dtype=dtype).flatten()]).astype(np.float32).reshape(array.shape)
     data_new[k] = torch.from_numpy(array_restore)
     print('restore diff mean', np.mean(array_restore - array), 'max', np.max(array_restore - array), 'min', np.min(array_restore - array))
-    # if len(array.shape) >= 2:
-    #   # save as splited lines
-    #   save_path_dir = DATA_PATH + model.name + '-' + k
-    #   if not os.path.exists(save_path_dir):
-    #     os.makedirs(save_path_dir)
-    #   for i in range(array.shape[0]):
-    #     if len(array.shape) == 2:
-    #       a = array_uint.reshape(array.shape)[i]
-    #     else:
-    #       a = array_uint.reshape([*list(array.shape)[:-2], array.shape[-1] * array.shape[-2]])[i]
-    #     d = np.hstack(a)
-    #     write_hex(d, save_path_dir + "/" + str(i))
   model.load_state_dict(data_new)
-  # test(model, device)
-  q_test(model, device)
+  # q_test(model, device)
         
 
-def run_model(model, model_path: str = ""):
+def run_model(model, model_path: str = "", test_manual: bool = False):
   set_seed(RANDOM_SEED)
   summary(model, (1, 28, 28))
   if not MODEL_CACHE or not os.path.exists(model_path):
@@ -203,7 +195,10 @@ def run_model(model, model_path: str = ""):
       test(model, device)
   # save model
   if len(model_path) > 0:
+    print("save model to", model_path)
     torch.save(model.state_dict(), model_path)
+  if test_manual:
+    manual_test(model, device)
   # dump_bsv(model)
   dump_binary_hex(model)
 
@@ -212,14 +207,14 @@ def fc():
   model_path = "fc.pt"
   if MODEL_CACHE and os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path))
-  run_model(model, model_path)
+  run_model(model, model_path=model_path, test_manual=True)
 
 def cnn():
   model = CNNNet().to(device)
   model_path = "cnn.pt"
   if MODEL_CACHE and os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path))
-  run_model(model, model_path)
+  run_model(model, model_path=model_path)
 
 def test_floats():
   num = 127.2133241
@@ -242,6 +237,7 @@ def dump_test_set():
     lst.append((data, target))
   random.shuffle(lst)
   data, target = lst[0]
+  data, target = Q(data.to(torch.float32)), Q(target.to(torch.float32))
   data, target = data.numpy(), target.numpy()
   data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype="u" + Q_TYPE).reshape(data.shape)
   target = np.array([float2fix(x, Q_BITS) for x in target.flatten()], dtype="u" + Q_TYPE)

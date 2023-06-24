@@ -30,13 +30,11 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   LayerData_ifc#(ElementType, lines, depth) data <- mkLayerData("fc", layer_name);
   Reg#(Bool) done <- mkReg(True);
   Reg#(out) tmp <- mkReg(unpack('0));
-  // Reg#(Vector#(lines, Int#(64))) tmp <- mkReg(unpack('0));
 
   FIFOF#(in) fifo_in <- mkFIFOF;
   FIFOF#(out) fifo_out <- mkFIFOF;
 
   rule start (done && fifo_in.notEmpty && data.weightsDone() && data.biasDone());
-    // $display("Layer %s start, input data %x", layer_name, pack(fifo_in.first));
     data.weightsStart();
     data.biasStart();
     done <= False;
@@ -49,18 +47,9 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     let weight <- data.getWeights();
     let top = fifo_in.first;
     out t = tmp;
-    // Vector#(lines, Int#(64)) t = tmp;
     let bias <- data.getBias();
-    // $display("Layer %s acc weights, index=%x, tmp=%x", layer_name, index, pack(tmp));
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      // Int#(64) w = extend(weight[i]);
-      // Int#(64) top_i = extend(top[index]);
-      // Int#(64) mul = top_i * w;
-      // ElementType truncated = truncate(mul >> q_bits());
-      // t[i] = tmp[i] + truncated + (index == extend(index_bias) ? bias : 0);
-      // t[i] = tmp[i] + ((top[index] * weight[i]) >> q_bits()) + (index == extend(index_bias) ? bias : 0);
       t[i] = tmp[i] + (top[index] * weight[i]) + (index == extend(index_bias) ? bias : 0);
-      // t[i] = tmp[i] + mul + (index == extend(index_bias) ? (extend(bias) << q_bits()) : 0);
     end
     tmp <= t;
     data.weightsInc();
@@ -69,48 +58,19 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
 
   rule acc_weights_only (!done && !data.weightsDone() && data.biasDone());
     let index = data.getWeightsIndex() - 1;
-    // $display("Layer %s acc weights only, index=%x", layer_name, index);
     let weight <- data.getWeights();
     let top = fifo_in.first;
     out t = tmp;
-    // Vector#(lines, Int#(64)) t = tmp;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-      // Int#(64) w = extend(weight[i]);
-      // Int#(64) top_i = extend(top[index]);
-      // Int#(64) mul = top_i * w;
-      // ElementType truncated = truncate(mul >> q_bits());
-      // t[i] = tmp[i] + truncated;
-      // t[i] = tmp[i] + mul;
-      // t[i] = tmp[i] + ((top[index] * weight[i]) >> q_bits());
       t[i] = tmp[i] + (top[index] * weight[i]);
     end
     tmp <= t;
     data.weightsInc();
   endrule
 
-  // rule acc_bias_only (!done && data.weightsDone() && !data.biasDone());
-  //   let index_bias = data.getBiasIndex() - 1;
-  //   // $display("Layer %s acc bias only, index_bias=%x", layer_name, index_bias);
-  //   let bias <- data.getBias();
-  //   out t = tmp;
-  //   t[index_bias] = tmp[index_bias] + bias;
-  //   tmp <= t;
-  // endrule
-
-  // function ElementType convertBits(Integer i);
-  //   return truncate(tmp[i] >> q_bits());
-  // endfunction
-
   rule set_done (!done && data.weightsDone() && data.biasDone());
-    // $display("Layer %s set done, tmp=%x", layer_name, pack(tmp));
     done <= True;
     fifo_out.enq(tmp);
-    // out o = map(convertBits, genVector);
-    // out o = unpack('0);
-    // for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
-    //   o[i] = convertBits(i);
-    // end
-    // fifo_out.enq(o);
     fifo_in.deq;
     tmp <= unpack('0);
   endrule
