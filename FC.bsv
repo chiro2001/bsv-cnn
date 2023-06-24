@@ -20,9 +20,12 @@ TestData_ifc#(ElementType, 28) input_data <- mkTestData;
 FIFOF#(ResultType) targets <- mkSizedFIFOF(10);
 
 Reg#(int) cnt <- mkReg(0);
-Integer max_cnt = 100000;
+Integer max_cnt = 800000;
 // Integer max_cnt = 3000;
 
+int maxTotal = fromInteger(valueOf(TEST_DATA_SZ));
+
+Reg#(int) totalPut <- mkReg(0);
 Reg#(int) total <- mkReg(0);
 Reg#(int) correct <- mkReg(0);
 
@@ -30,7 +33,7 @@ rule hello (cnt == 0);
   $display("Hello FC");
 endrule
 
-rule stop (cnt >= fromInteger(max_cnt));
+rule stop if (cnt >= fromInteger(max_cnt) || total > maxTotal);
   $display("Stopping, total: %d, correct: %d, accuracy: %d %%", total, correct, correct * 100 / total);
   $finish(0);
 endrule
@@ -39,13 +42,14 @@ rule inc_cnt (cnt < fromInteger(max_cnt));
   cnt <= cnt + 1;
 endrule
 
-rule put_data;
+rule put_data if (totalPut + 1 < maxTotal);
   let d <- input_data.get;
   match {.target, .data} = d;
   let target_int = elementToInt(target);
   fc1.put(flatten(data));
   ResultType t = truncate(pack(target_int));
   targets.enq(t);
+  totalPut <= totalPut + 1;
 endrule
 
 rule put_data_relu1;
