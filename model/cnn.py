@@ -14,8 +14,8 @@ class CNNNet(nn.Module):
     # self.conv2 = nn.Conv2d(8, 4, 3, 1)
     # self.fc1 = nn.Linear(4 * 16 * 3 * 3, 32)
     # self.fc2 = nn.Linear(32, 10)
-    self.conv1 = nn.Conv2d(1, 4, 3, 1)
-    self.fc1 = nn.Linear(676, 10)
+    self.conv1 = nn.Conv2d(1, 2, 3, 1)
+    self.fc1 = nn.Linear(338, 10)
 
   def forward(self, x):
     # x = self.conv1(x)

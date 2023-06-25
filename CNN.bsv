@@ -32,19 +32,19 @@ module mkTb();
 // // (32, ) -> (10, )
 // // fc2
 
-// (1, 28, 28) -> (4, 26, 26)
+// (1, 28, 28) -> (2, 26, 26)
 Layer#(
     Vector#(1, Vector#(28, Vector#(28, ElementType))), 
-    Vector#(4, Vector#(26, Vector#(26, ElementType)))
+    Vector#(2, Vector#(26, Vector#(26, ElementType)))
   ) conv1 <- mkConvLayer("conv1");
-// (4, 26, 26) -> (4, 13, 13)
+// (2, 26, 26) -> (2, 13, 13)
 Layer#(
-  Vector#(4, Vector#(26, Vector#(26, ElementType))),
-  Vector#(4, Vector#(13, Vector#(13, ElementType)))
+  Vector#(2, Vector#(26, Vector#(26, ElementType))),
+  Vector#(2, Vector#(13, Vector#(13, ElementType)))
 ) max_pooling1 <- mkMaxPoolingLayer;
-// flatten -> relu -> (676, )
-Layer#(Vector#(676, ElementType), Vector#(676, ElementType)) relu1 <- mkReluLayer;
-Layer#(Vector#(676, ElementType), Vector#(10, ElementType)) fc1 <- mkFCLayer("fc1");
+// flatten -> relu -> (338, )
+Layer#(Vector#(338, ElementType), Vector#(338, ElementType)) relu1 <- mkReluLayer;
+Layer#(Vector#(338, ElementType), Vector#(10, ElementType)) fc1 <- mkFCLayer("cnn", "fc1");
 Layer#(Vector#(10, ElementType), ResultType) softmax <- mkSoftmaxLayer;
 
 TestData_ifc#(ElementType, InputWidth, InputHeight) input_data <- mkTestData;

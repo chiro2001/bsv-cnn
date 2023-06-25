@@ -114,7 +114,7 @@ def write_hex_2d(data, path):
   # if not write_hex_2d_g:
   #   write_hex_2d_g = True
 
-def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int = 0):
+def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int = 0, fixed: bool = False):
   valid_bits = int(Q_TYPE[3:])
   name = model.name.lower()
   with open(GEN_PATH + name + ".bsv", "w") as f:
@@ -130,7 +130,8 @@ def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int =
           data = data.reshape([-1])
         else:
           data = data.reshape([*data.shape[:max_dim - 1], -1])
-      data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype=Q_TYPE).reshape(data.shape)
+      if fixed:
+        data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype=Q_TYPE).reshape(data.shape)
       f.write(f"// model {name} key {key} \n")
       
       def write_function_header(typ: str, typ2=None, typ3="a"):
@@ -209,7 +210,7 @@ def dump_binary_hex(model):
   # q_test(model, device)
         
 
-def run_model(model, model_path: str = "", test_manual: bool = False):
+def run_model(model, model_path: str = "", test_manual: bool = False, fixed: bool = False):
   set_seed(RANDOM_SEED)
   summary(model, (1, 28, 28))
   if not MODEL_CACHE or not os.path.exists(model_path):
@@ -222,7 +223,7 @@ def run_model(model, model_path: str = "", test_manual: bool = False):
     torch.save(model.state_dict(), model_path)
   if test_manual:
     manual_test(model, device)
-  dump_bsv(model, max_dim=2)
+  dump_bsv(model, max_dim=2, fixed=fixed)
   dump_binary_hex(model)
 
 def fc():
@@ -276,5 +277,5 @@ def dump_test_set():
 if __name__ == '__main__':
   # test_floats()
   dump_test_set()
-  # fc()
+  fc()
   cnn()

@@ -19,7 +19,7 @@ interface LayerDirect#(type in, type out);
   method out get;
 endinterface
 
-module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
+module mkFCLayer#(parameter String model_name, parameter String layer_name)(Layer#(in, out))
   provisos(
     Bits#(out, lines_bits), 
     Bits#(in, depth_bits), 
@@ -31,7 +31,7 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
     PrimWriteable#(Reg#(Vector#(lines, ElementTmpType)), ElementTmpType),
     Add#(TLog#(lines), a__, TLog#(depth))
   );
-  LayerData_ifc#(ElementType, lines, depth) data <- mkLayerData("fc", layer_name);
+  LayerData_ifc#(ElementType, lines, depth) data <- mkLayerData(model_name, layer_name);
   Reg#(Bool) done <- mkReg(True);
   Reg#(Vector#(lines, ElementTmpType)) tmp <- mkReg(unpack('0));
 
@@ -200,8 +200,8 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
 
   FIFO#(Vector#(TMul#(kernel_size_2, input_channels), ElementType)) cols <- mkFIFO;
 
-  rule img2col if (col_i < fromInteger(valueOf(TMul#(output_size, output_channels))));
-    let next_col_i = col_i + 1;
+  rule img2col;
+    $display("[img2col] col_i = %d", col_i);
     let data_in = fifo_in.first;
     Vector#(TMul#(kernel_size_2, input_channels), ElementType) col = unpack('0);
     let x = col_i / fromInteger(valueOf(output_lines));
@@ -214,8 +214,12 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
       end
     end
     cols.enq(col);
-
-    col_i <= next_col_i;
+    if (col_i < fromInteger(valueOf(TMul#(output_size, output_channels)))) begin
+      col_i <= col_i + 1;
+    end
+    else begin
+      col_i <= 0;
+    end
   endrule
 
   // total: output_size
@@ -225,6 +229,7 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   let bias_data = cnn_conv1_bias();
 
   rule calculate_mul_col;
+    $display("calculate_mul_col");
     let top = cols.first;
     cols.deq;
     Vector#(TMul#(kernel_size_2, output_channels), ElementType) col = unpack('0);
@@ -241,6 +246,7 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   FIFO#(Vector#(output_channels, ElementType)) col_acc_results <- mkFIFO;
 
   rule calculate_acc_col;
+    $display("calculate_acc_col");
     let top = col_mul_results.first;
     col_mul_results.deq;
     Vector#(output_channels, ElementType) sum = unpack('0);
@@ -256,12 +262,17 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   Reg#(out) tmp <- mkReg(unpack('0));
 
   Reg#(Bit#(TLog#(output_size))) output_cnt <- mkReg(0);
+
   rule cols_to_output;
     let top = col_acc_results.first;
     col_acc_results.deq;
+    $display("[cols_to_output] output_cnt = %d", output_cnt);
     let x = output_cnt / fromInteger(valueOf(output_lines));
     let y = output_cnt % fromInteger(valueOf(output_lines));
     out upd = tmp;
+    if (output_cnt == 0) begin
+      upd = unpack('0);
+    end
     for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
       upd[channel][x][y] = top[channel];
     end
@@ -269,6 +280,7 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
       output_cnt <= 0;
       tmp <= unpack('0);
       fifo_out.enq(upd);
+      fifo_in.deq;
     end
     else begin
       output_cnt <= output_cnt + 1;

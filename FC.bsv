@@ -11,9 +11,9 @@ typedef 64 HiddenSize;
 
 module mkTb();
 
-Layer#(Vector#(TMul#(InputWidth, InputHeight), ElementType), Vector#(HiddenSize, ElementType)) fc1 <- mkFCLayer("fc1");
+Layer#(Vector#(TMul#(InputWidth, InputHeight), ElementType), Vector#(HiddenSize, ElementType)) fc1 <- mkFCLayer("fc", "fc1");
 Layer#(Vector#(HiddenSize, ElementType), Vector#(HiddenSize, ElementType)) relu1 <- mkReluLayer;
-Layer#(Vector#(HiddenSize, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc2");
+Layer#(Vector#(HiddenSize, ElementType), Vector#(10, ElementType)) fc2 <- mkFCLayer("fc", "fc2");
 Layer#(Vector#(10, ElementType), ResultType) softmax <- mkSoftmaxLayer;
 
 TestData_ifc#(ElementType, InputWidth, InputHeight) input_data <- mkTestData;
