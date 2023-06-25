@@ -63,9 +63,10 @@ def manual_test(model, device):
   count = 0
   dataset_use = train_loader
   # dataset_use = test_loader
+  max_len = 4
   with torch.no_grad():
     for data, target in dataset_use:
-      data, target = data.to(device), target.to(device)
+      data, target = data.to(device)[:max_len], target.to(device)[:max_len]
       output = model.manual_forward(data)
       pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
       correct += pred.eq(target.view_as(pred)).sum().item()
@@ -228,7 +229,7 @@ def cnn():
   model_path = "cnn.pt"
   if MODEL_CACHE and os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path))
-  run_model(model, model_path=model_path)
+  run_model(model, model_path=model_path, test_manual=True)
 
 def test_floats():
   num = 127.2133241
@@ -267,5 +268,5 @@ def dump_test_set():
 if __name__ == '__main__':
   # test_floats()
   dump_test_set()
-  fc()
-  # cnn()
+  # fc()
+  cnn()

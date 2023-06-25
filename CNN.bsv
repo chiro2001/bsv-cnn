@@ -4,16 +4,19 @@ import FIFO::*;
 import Utils::*;
 import Data::*;
 import Layers::*;
+import Config::*;
+
+typedef 3 KernelSize;
 
 module mkTb();
 
 Layer#(
-    Vector#(28, Vector#(28, ElementType)), 
-    Vector#(8, Vector#(26, Vector#(26, ElementType)))
+    Vector#(InputWidth, Vector#(InputHeight, ElementType)), 
+    Vector#(8, Vector#(TSub#(InputWidth, TSub#(KernelSize, 1)), Vector#(TSub#(InputHeight, TSub#(KernelSize, 1)), ElementType)))
   ) conv1 <- mkConvLayer("conv1");
 
 Reg#(int) cnt <- mkReg(0);
-Integer max_cnt = 10000;
+Integer max_cnt = 100;
 
 rule hello (cnt == 0);
   $display("Hello CNN");

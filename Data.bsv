@@ -114,37 +114,36 @@ module mkLayerData#(parameter String model_name, parameter String layer_name)(La
 
 endmodule
 
-interface TestData_ifc#(type td, type width);
-  method ActionValue#(Tuple2#(td, Vector#(width, Vector#(width, td)))) get;
+interface TestData_ifc#(type td, numeric type width, numeric type height);
+  method ActionValue#(Tuple2#(td, Vector#(width, Vector#(height, td)))) get;
 endinterface
 
-module mkTestData(TestData_ifc#(td, width))
+module mkTestData(TestData_ifc#(td, width, height))
   provisos (
     Bits#(td, sz), 
     Literal#(td),
-    Bits#(Vector::Vector#(width, Vector::Vector#(width, td)), data_sz),
+    Mul#(TMul#(width, height), sz, data_sz),
     Add#(data_sz, sz, tot_sz)
   );
   let data_path = "data/test_input.data.hex";
   let target_path = "data/test_input.target.hex";
   let size = valueOf(TEST_DATA_SZ);
-  BRAM1Port#(Bit#(10), Bit#(data_sz)) data
-      <- mkBRAM1Server(BRAM_Configure{
+  BRAM1Port#(Bit#(TLog#(TEST_DATA_SZ)), Bit#(data_sz)) data <- mkBRAM1Server(BRAM_Configure{
     memorySize: size, 
     latency: 1, 
     outFIFODepth: 3, 
     allowWriteResponseBypass:False, 
     loadFormat: tagged Hex data_path
   });
-  BRAM1Port#(Bit#(10), Bit#(sz)) target <- mkBRAM1Server(BRAM_Configure{
+  BRAM1Port#(Bit#(TLog#(TEST_DATA_SZ)), Bit#(sz)) target <- mkBRAM1Server(BRAM_Configure{
     memorySize: size, 
     latency: 1, 
     outFIFODepth: 3, 
     allowWriteResponseBypass:False, 
     loadFormat: tagged Hex target_path
   });
-  FIFOF#(Tuple2#(td, Vector::Vector#(width, Vector::Vector#(width, td)))) fifo <- mkFIFOF;
-  Reg#(Bit#(10)) index <- mkReg(0);
+  FIFOF#(Tuple2#(td, Vector::Vector#(width, Vector::Vector#(height, td)))) fifo <- mkFIFOF;
+  Reg#(Bit#(TLog#(TEST_DATA_SZ))) index <- mkReg(0);
 
   rule req_data;
     data.portA.request.put(BRAMRequest{
@@ -169,7 +168,7 @@ module mkTestData(TestData_ifc#(td, width))
     fifo.enq(tuple2(target, data));
   endrule
 
-  method ActionValue#(Tuple2#(td, Vector#(width, Vector#(width, td)))) get;
+  method ActionValue#(Tuple2#(td, Vector#(width, Vector#(height, td)))) get;
     fifo.deq;
     index <= index + 1;
     return fifo.first;

@@ -1,6 +1,9 @@
 // typedef 20 Q_BITS;
 // typedef 32 Q_WORD;
 
+typedef 28 InputWidth;
+typedef 28 InputHeight;
+
 typedef 8 Q_BITS;
 typedef 16 Q_WORD;
 

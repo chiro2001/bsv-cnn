@@ -31,7 +31,6 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
   );
   LayerData_ifc#(ElementType, lines, depth) data <- mkLayerData("fc", layer_name);
   Reg#(Bool) done <- mkReg(True);
-  // Reg#(out) tmp <- mkReg(unpack('0));
   Reg#(Vector#(lines, ElementTmpType)) tmp <- mkReg(unpack('0));
 
   FIFOF#(in) fifo_in <- mkFIFOF;
@@ -46,7 +45,6 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
 
   rule acc_weights_bias if (!done && !data.weightsDone() && !data.biasDone());
     let index = data.getWeightsIndex() - 1;
-    // let index_bias = data.getBiasIndex() - 1;
     let weight <- data.getWeights();
     let top = fifo_in.first;
     Vector#(lines, ElementTmpType) t = tmp;
@@ -56,9 +54,6 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
       ElementTmpType mul = elementMult(top[index], weight[i]);
       t[i] = (index == 0 ? 0 : tmp[i]) + mul + (fromInteger(i) == index ? bias_tmp : 0);
     end
-    // if (index < 6 && layer_name == "fc1") begin
-    //   $display("[idx=%d] t[0] = %d, tmp[0] = %d", index, elementToInt(elementTruncate(t[0])), elementToInt(elementTruncate(tmp[0])));
-    // end
     tmp <= t;
     data.weightsInc();
     data.biasInc();
@@ -79,7 +74,6 @@ module mkFCLayer#(parameter String layer_name)(Layer#(in, out))
 
   rule set_done if (!done && data.weightsDone() && data.biasDone());
     done <= True;
-    // fifo_out.enq(tmp);
     out o;
     for (Integer i = 0; i < valueOf(lines); i = i + 1) begin
       o[i] = elementTruncate(tmp[i]);
@@ -112,18 +106,8 @@ module mkSoftmaxLayer(Layer#(in, out))
 
   method Action put(in x);
     out y = unpack('0);
-    // for (Integer i = 0; i < valueOf(input_size); i = i + 1) begin
-    //   $write("%d ", elementToInt(x[i]));
-    // end
-    // $display("");
-    // just `hard' max
     for (Integer i = 1; i < valueOf(input_size); i = i + 1) begin
       if (x[i] > x[y]) begin
-        // $write("max from %d ", y);
-        // $write(fshow(x[y]));
-        // $write(" to ");
-        // $write(fshow(x[i]));
-        // $display(" %d", i);
         y = fromInteger(i);
       end
     end
