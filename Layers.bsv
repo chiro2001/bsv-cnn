@@ -201,7 +201,7 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   FIFO#(Vector#(TMul#(kernel_size_2, input_channels), ElementType)) cols <- mkFIFO;
 
   rule img2col;
-    $display("[img2col] col_i = %d", col_i);
+    // $display("[img2col] col_i = %d", col_i);
     let data_in = fifo_in.first;
     Vector#(TMul#(kernel_size_2, input_channels), ElementType) col = unpack('0);
     let x = col_i / fromInteger(valueOf(output_lines));
@@ -223,20 +223,20 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   endrule
 
   // total: output_size
-  FIFO#(Vector#(TMul#(kernel_size_2, output_channels), ElementType)) col_mul_results <- mkFIFO;
+  FIFO#(Vector#(TMul#(kernel_size_2, output_channels), ElementTmpType)) col_mul_results <- mkFIFO;
 
   let weights_data = cnn_conv1_weight();
   let bias_data = cnn_conv1_bias();
 
   rule calculate_mul_col;
-    $display("calculate_mul_col");
+    // $display("calculate_mul_col");
     let top = cols.first;
     cols.deq;
-    Vector#(TMul#(kernel_size_2, output_channels), ElementType) col = unpack('0);
+    Vector#(TMul#(kernel_size_2, output_channels), ElementTmpType) col = unpack('0);
     for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
       let weights = weights_data[channel];
       for (Integer i = 0; i < valueOf(kernel_size_2); i = i + 1) begin
-        col[channel * valueOf(kernel_size_2) + i] = elementTruncate(elementMult(top[i], weights[i]));
+        col[channel * valueOf(kernel_size_2) + i] = elementMult(top[i], weights[i]);
       end
     end
     col_mul_results.enq(col);
@@ -246,17 +246,19 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   FIFO#(Vector#(output_channels, ElementType)) col_acc_results <- mkFIFO;
 
   rule calculate_acc_col;
-    $display("calculate_acc_col");
+    // $display("calculate_acc_col");
     let top = col_mul_results.first;
     col_mul_results.deq;
-    Vector#(output_channels, ElementType) sum = unpack('0);
+    Vector#(output_channels, ElementTmpType) sum = unpack('0);
+    Vector#(output_channels, ElementType) sum_truncate = unpack('0);
     for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
       for (Integer i = 0; i < valueOf(kernel_size_2); i = i + 1) begin
         sum[channel] = sum[channel] + top[channel * valueOf(kernel_size_2) + i];
       end
-      sum[channel] = sum[channel] + bias_data[channel];
+      sum[channel] = sum[channel] + elementExtend(bias_data[channel]);
+      sum_truncate[channel] = elementTruncate(sum[channel]);
     end
-    col_acc_results.enq(sum);
+    col_acc_results.enq(sum_truncate);
   endrule
 
   Reg#(out) tmp <- mkReg(unpack('0));
@@ -266,7 +268,7 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
   rule cols_to_output;
     let top = col_acc_results.first;
     col_acc_results.deq;
-    $display("[cols_to_output] output_cnt = %d", output_cnt);
+    // $display("[cols_to_output] output_cnt = %d", output_cnt);
     let x = output_cnt / fromInteger(valueOf(output_lines));
     let y = output_cnt % fromInteger(valueOf(output_lines));
     out upd = tmp;

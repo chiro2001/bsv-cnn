@@ -25,7 +25,7 @@ Q_BITS = 8
 MODEL_CACHE = True
 
 device = torch.device("cpu")
-epochs = 1
+epochs = 3
 
 def get_optimizer(model):
   return torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
