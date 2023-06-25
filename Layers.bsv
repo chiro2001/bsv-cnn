@@ -268,16 +268,19 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
 
   // Reg#(Vector#(output_channels, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementTmpType)))) 
   //   tmp <- mkReg(unpack('0));
-  Reg#(out) tmp <- mkReg(unpack('0));
+  // Reg#(out) tmp <- mkReg(unpack('0));
+  Vector#(output_channels, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Reg#(ElementType))))
+    tmp <- replicateM(replicateM(replicateM(mkRegU)));
 
-  FIFO#(ConvReq#(Bit#(output_channels), Bit#(TLog#(output_lines_2)), Bit#(TLog#(output_lines_2)))) reqPipe <- mkFIFO;
+  // FIFO#(ConvReq#(Bit#(output_channels), Bit#(TLog#(output_lines_2)), Bit#(TLog#(output_lines_2)))) reqPipe <- mkFIFO;
 
   Reg#(Bit#(output_channels)) c <- mkReg(unpack('0));
   Reg#(Bit#(TLog#(output_lines_2))) i <- mkReg(unpack('0));
   Reg#(Bit#(TLog#(output_lines_2))) j <- mkReg(unpack('0));
   Reg#(Bit#(TLog#(TMul#(output_channels, kernel_size_2)))) xi <- mkReg(unpack('0));
 
-  rule enq_requests;
+  // rule enq_requests;
+  rule handle;
     let weights = cnn_conv1_weight();
     let top = fifo_in.first;
     Bit#(output_channels) nc = c;
@@ -314,48 +317,68 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
         end
       end
       ElementType ww = unpack(pack(weights[nc][nxi]));
-      reqPipe.enq(tagged MulReq { c: nc, i: ni, j: nj, x: xx, y: ww });
+      // reqPipe.enq(tagged MulReq { c: nc, i: ni, j: nj, x: xx, y: ww });
+
+      // let upd = tmp;
+      // upd[nc][ni][nj] = tmp[nc][ni][nj] + elementTruncate(elementMult(xx, ww));
+      // tmp <= upd;
+
+      tmp[nc][ni][nj] <= tmp[nc][ni][nj] + elementTruncate(elementMult(xx, ww));
     end
     else begin
-      reqPipe.enq(tagged FinishReq);
-    end
-  endrule
+      // reqPipe.enq(tagged FinishReq);
+      // fifo_out.enq(tmp);
 
-  rule apply_requests;
-    let req = reqPipe.first;
-    reqPipe.deq;
-    let upd = tmp;
-    if (req matches tagged MulReq .mul_req) begin
-      let mul_raw = elementMult(mul_req.x, mul_req.y);
-      // upd[mul_req.c][mul_req.i][mul_req.j] = tmp[mul_req.c][mul_req.i][mul_req.j] + mul_raw;
-      upd[mul_req.c][mul_req.i][mul_req.j] = tmp[mul_req.c][mul_req.i][mul_req.j] + elementTruncate(mul_raw);
-    end
-    else if (req matches tagged FinishReq) begin
-      // out o = unpack('0);
-      // for (Integer c = 0; c < valueOf(output_channels); c = c + 1) begin
-      //   for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-      //     for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-      //       o[c][i][j] = elementTruncate(upd[c][i][j]);
-      //     end
-      //   end
-      // end
-      let o = tmp;
+      out o = unpack('0);
+      // o = unpack(pack(tmp));
+      for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
+        for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
+          for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
+            o[channel][ii][jj] = tmp[channel][ii][jj];
+          end
+        end
+      end
       fifo_out.enq(o);
+
       fifo_in.deq;
     end
-    tmp <= upd;
   endrule
 
+  // rule apply_requests;
+  //   let req = reqPipe.first;
+  //   reqPipe.deq;
+  //   let upd = tmp;
+  //   if (req matches tagged MulReq .mul_req) begin
+  //     let mul_raw = elementMult(mul_req.x, mul_req.y);
+  //     // upd[mul_req.c][mul_req.i][mul_req.j] = tmp[mul_req.c][mul_req.i][mul_req.j] + mul_raw;
+  //     upd[mul_req.c][mul_req.i][mul_req.j] = tmp[mul_req.c][mul_req.i][mul_req.j] + elementTruncate(mul_raw);
+  //   end
+  //   else if (req matches tagged FinishReq) begin
+  //     // out o = unpack('0);
+  //     // for (Integer c = 0; c < valueOf(output_channels); c = c + 1) begin
+  //     //   for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
+  //     //     for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
+  //     //       o[c][i][j] = elementTruncate(upd[c][i][j]);
+  //     //     end
+  //     //   end
+  //     // end
+  //     let o = tmp;
+  //     fifo_out.enq(o);
+  //     fifo_in.deq;
+  //   end
+  //   tmp <= upd;
+  // endrule
+
   let bias_data = cnn_conv1_bias();
-  out tmp_init = unpack('0);
-  for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
-    for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
-      for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
-        // t[channel][ii][jj] = elementExtend(unpack(pack(bias_data[channel])));
-        tmp_init[channel][ii][jj] = unpack(pack(bias_data[channel]));
-      end
-    end
-  end
+  // out tmp_init = unpack('0);
+  // for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
+  //   for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
+  //     for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
+  //       // t[channel][ii][jj] = elementExtend(unpack(pack(bias_data[channel])));
+  //       tmp_init[channel][ii][jj] = unpack(pack(bias_data[channel]));
+  //     end
+  //   end
+  // end
 
   method Action put(in x);
     // Vector#(output_channels, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementTmpType))) t = unpack('0);
@@ -369,7 +392,17 @@ module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
     //   end
     // end
     // tmp <= t;
-    tmp <= tmp_init;
+
+    // tmp <= tmp_init;
+
+    for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
+      for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
+        for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
+          tmp[channel][ii][jj] <= unpack(pack(bias_data[channel]));
+        end
+      end
+    end
+
     fifo_in.enq(x);
   endmethod
 

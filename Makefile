@@ -21,6 +21,10 @@ test-%:
 	-cd $(ROOT)/tests && ROOT=$(ROOT) $(ROOT)/bsvbuild.sh $(BSC_ARGS) $*.bsv $(MAX_TIME)
 	$(MAKE) -C $(ROOT) clean
 
+testverilog-%:
+	-cd $(ROOT)/tests && ROOT=$(ROOT) $(ROOT)/bsvbuild.sh $(BSC_VERILOG_ARGS) $*.bsv $(MAX_TIME)
+	$(MAKE) -C $(ROOT) clean
+
 test: $(TESTS:%=test-%)
 
 clean:
