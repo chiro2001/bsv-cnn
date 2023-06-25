@@ -53,7 +53,6 @@ def manual_conv_layer(layer, x):
   out_size = (x0.shape[2] + 1 - kernel_size, x0.shape[3] + 1 - kernel_size)
   output_channel = w.shape[0]
   out = np.zeros((output_channel, *out_size), dtype=dtype2)
-  print(f"Conv: {x0.shape}, {w.shape}, {b.shape} -> {out.shape}")
   for c in range(output_channel):
     for i in range(out_size[0]):
       for j in range(out_size[1]):

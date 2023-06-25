@@ -114,15 +114,23 @@ def write_hex_2d(data, path):
   # if not write_hex_2d_g:
   #   write_hex_2d_g = True
 
-def dump_bsv(model, vector: bool = False):
+def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int = 0):
+  valid_bits = int(Q_TYPE[3:])
   name = model.name.lower()
   with open(GEN_PATH + name + ".bsv", "w") as f:
     f.write(f"// generated file\npackage {name};\n\nimport Vector::*;\n\n")
     def get_layer_name(original: str) -> str:
       return (name + "_" + original).replace(".", "_").replace("-", "_")
     for key in model.state_dict():
+      if conv_only and "conv" not in key:
+        continue
       data = model.state_dict()[key]
-      data = np.array([float2fix(x, 6) for x in data.flatten()], dtype="int8").reshape(data.shape)
+      if max_dim > 0 and len(data.shape) > max_dim:
+        if max_dim == 1:
+          data = data.reshape([-1])
+        else:
+          data = data.reshape([*data.shape[:max_dim - 1], -1])
+      data = np.array([float2fix(x, Q_BITS) for x in data.flatten()], dtype=Q_TYPE).reshape(data.shape)
       f.write(f"// model {name} key {key} \n")
       
       def write_function_header(typ: str, typ2=None, typ3="a"):
@@ -132,20 +140,20 @@ def dump_bsv(model, vector: bool = False):
       
       if vector:
         if len(data.shape) == 1:
-          typ = f"Vector#({data.shape[0]}, Int#(8))"
+          typ = f"Vector#({data.shape[0]}, Int#({valid_bits}))"
           write_function_header(typ)
           for i in range(data.shape[0]):
             f.write(f"a[{i}]={data[i]};")
           f.write("\n")
         elif len(data.shape) == 2:
-          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Int#(8)))"
+          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Int#({valid_bits})))"
           write_function_header(typ)
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
               f.write(f"a[{i}][{j}]={data[i][j]};")
             f.write("\n")
         elif len(data.shape) == 4:
-          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, Int#(8)))))"
+          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, Int#({valid_bits})))))"
           write_function_header(typ)
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
@@ -155,18 +163,18 @@ def dump_bsv(model, vector: bool = False):
               f.write("\n")
       else:
         if len(data.shape) == 1:
-          write_function_header(f"Int#(8) a[{data.shape[0]}]", "Int#(8)[]", "")
+          write_function_header(f"Int#({valid_bits}) a[{data.shape[0]}]", f"Int#({valid_bits})[]", "")
           for i in range(data.shape[0]):
             f.write(f"a[{i}]={data[i]};")
           f.write("\n")
         elif len(data.shape) == 2:
-          write_function_header(f"Int#(8) a[{data.shape[0]}][{data.shape[1]}]", "Int#(8)[][]", "")
+          write_function_header(f"Int#({valid_bits}) a[{data.shape[0]}][{data.shape[1]}]", f"Int#({valid_bits})[][]", "")
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
               f.write(f"a[{i}][{j}]={data[i][j]};")
             f.write("\n")
         elif len(data.shape) == 4:
-          write_function_header(f"Int#(8) a[{data.shape[0]}][{data.shape[1]}][{data.shape[2]}][{data.shape[3]}]", "Int#(8)[][][][]", "")
+          write_function_header(f"Int#({valid_bits}) a[{data.shape[0]}][{data.shape[1]}][{data.shape[2]}][{data.shape[3]}]", f"Int#({valid_bits})[][][][]", "")
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
               for k in range(data.shape[2]):
@@ -214,7 +222,7 @@ def run_model(model, model_path: str = "", test_manual: bool = False):
     torch.save(model.state_dict(), model_path)
   if test_manual:
     manual_test(model, device)
-  # dump_bsv(model)
+  dump_bsv(model, max_dim=2)
   dump_binary_hex(model)
 
 def fc():

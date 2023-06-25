@@ -67,7 +67,6 @@ class CNNNet(nn.Module):
     return output
 
   def manual_forward(self, x):
-    # self.forward(x)
     if len(x.shape) >= 4:
       return torch.tensor(np.array([self.manual_forward(x[i]).detach().numpy() for i in range(x.shape[0])]))
     x = manual_conv_layer(self.conv1, x)
@@ -75,10 +74,6 @@ class CNNNet(nn.Module):
     x = manual_conv_layer(self.conv2, x)
     x[x < 0] = 0
     x = torch.tensor(fix2floatv(x, Q_BITS), dtype=torch.float32)
-    # x = self.conv1(x)
-    # x = F.relu(x)
-    # x = self.conv2(x)
-    # x = F.relu(x)
     x = F.max_pool2d(x, 2)
     x = Q(x)
     x = torch.flatten(x)
@@ -86,13 +81,6 @@ class CNNNet(nn.Module):
     x = manual_fc_layer(self.fc1, x)
     x[x < 0] = 0
     x = manual_fc_layer(self.fc2, x)
-    # x = self.fc1(x)
-    # x = F.relu(x)
-    # x = self.fc2(x)
-    # print('after fc2, x', x)
     x = torch.tensor(fix2floatv(x, Q_BITS), dtype=torch.float32)
-    # print('after tensor, x', x.detach().numpy())
     output = F.log_softmax(x, dim=0)
-    # print('after softmax, output', output.detach().numpy())
-    # print('maual done')
     return output

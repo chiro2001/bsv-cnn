@@ -11,9 +11,10 @@ if [[ -z "$ROOT" ]]; then
   ROOT=`pwd`
 fi
 
-# CUSTOMBSV="-p +:$ROOT/bluelib/src"
-# CUSTOMBSV="-p +:$ROOT/gen"
-CUSTOMBSV="+RTS -Ksize -RTS -steps-max-intervals 10000000 -p +:$ROOT"
+CUSTOMBSV="+RTS -Ksize -RTS -steps-max-intervals 10000000"
+CUSTOMBSV="$CUSTOMBSV -p +:$ROOT"
+# CUSTOMBSV="$CUSTOMBSV -p +:$ROOT/bluelib/src"
+CUSTOMBSV="$CUSTOMBSV -p +:$ROOT/gen"
 
 alias echo="echo -e"
 

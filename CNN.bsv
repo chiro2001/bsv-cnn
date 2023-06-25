@@ -5,13 +5,14 @@ import Utils::*;
 import Data::*;
 import Layers::*;
 import Config::*;
+import cnn::*;
 
 typedef 3 KernelSize;
 
 module mkTb();
 
 Layer#(
-    Vector#(InputWidth, Vector#(InputHeight, ElementType)), 
+    Vector#(1, Vector#(InputWidth, Vector#(InputHeight, ElementType))), 
     Vector#(8, Vector#(TSub#(InputWidth, TSub#(KernelSize, 1)), Vector#(TSub#(InputHeight, TSub#(KernelSize, 1)), ElementType)))
   ) conv1 <- mkConvLayer("conv1");
 

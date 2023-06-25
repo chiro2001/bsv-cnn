@@ -35,6 +35,10 @@ function Int#(Q_WORD) elementToInt(ElementType a);
   return extend(fxptGetInt(a));
 endfunction
 
+function ElementType elementFromInt(Int#(TSub#(Q_WORD, Q_BITS)) i);
+  return fromInt(i);
+endfunction
+
 `else
 
 typedef Int#(Q_WORD) ElementType;
@@ -54,6 +58,10 @@ endfunction
 
 function Int#(Q_WORD) elementToInt(ElementType a);
   return extend(a >> valueOf(Q_BITS));
+endfunction
+
+function ElementType elementFromInt(Int#(Q_WORD) i);
+  return i << Q_BITS;
 endfunction
 
 `endif
