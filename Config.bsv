@@ -10,7 +10,7 @@ typedef 16 Q_WORD;
 // typedef 64 TEST_DATA_SZ;
 typedef 1000 TEST_DATA_SZ;
 
-`define USE_FIXED_POINT
+// `define USE_FIXED_POINT
 
 `ifdef USE_FIXED_POINT
 
@@ -61,7 +61,7 @@ function Int#(Q_WORD) elementToInt(ElementType a);
 endfunction
 
 function ElementType elementFromInt(Int#(Q_WORD) i);
-  return i << Q_BITS;
+  return i << valueOf(Q_BITS);
 endfunction
 
 `endif

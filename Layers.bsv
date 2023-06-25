@@ -2,6 +2,7 @@ import FIFOF::*;
 import FIFO::*;
 import Vector::*;
 import FixedPoint::*;
+import BuildVector::*;
 
 import Data::*;
 import Utils::*;
@@ -170,239 +171,171 @@ typedef union tagged {
 } ConvReq#(type tc, type ti, type tj)
   deriving (Bits, Eq, FShow);
 
+// input shape: (input_channels, input_lines, input_lines)
+// output shape: (output_channels, output_lines, output_lines)
 module mkConvLayer#(parameter String layer_name)(Layer#(in, out))
 // now assuming that stride == 1
   provisos (
     Bits#(in, input_bits),
-    Mul#(input_size, SizeOf#(ElementType), input_bits),
-    Mul#(input_lines, input_lines, input_size),
     Bits#(out, output_bits),
     Mul#(TMul#(output_size, SizeOf#(ElementType)), output_channels, output_bits),
+    Mul#(TMul#(input_size, SizeOf#(ElementType)), input_channels, input_bits),
+    Mul#(input_lines, input_lines, input_size),
     Mul#(output_lines, output_lines, output_size),
-    Add#(output_lines, 4, output_lines_2),
+    Add#(output_lines, 2, output_lines_2),
     // 3D vectors required
     PrimSelectable#(in, Vector::Vector#(input_lines, Vector::Vector#(input_lines, ElementType))),
     PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementType))),
     Add#(output_lines, kernel_size, TAdd#(input_lines, 1)),
     Mul#(kernel_size, kernel_size, kernel_size_2),
-    Mul#(kernel_size_2, SizeOf#(ElementType), kernel_size_2_bits),
+    // Mul#(kernel_size_2, SizeOf#(ElementType), kernel_size_2_bits),
     // Add#(kernel_size, 0, 3),
     PrimUpdateable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementType)))
   );
 
-  // TODO: deepper i/o fifos
   FIFOF#(in) fifo_in <- mkFIFOF;
   FIFOF#(out) fifo_out <- mkFIFOF;
 
-  // Wire#(in) data_in <- mkWire;
+  Reg#(Bit#(TAdd#(1, TLog#(TMul#(output_size, output_channels))))) col_i <- mkReg(unpack('0));
 
-  // rule set_data_in;
-  //   data_in <= fifo_in.first;
-  // endrule
+  FIFO#(Vector#(TMul#(kernel_size_2, input_channels), ElementType)) cols <- mkFIFO;
 
-  // Wire#(Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits)))) cols <- mkWire;
-  // // Vector#(output_lines, Vector#(output_lines, Reg#(ElementType))) data_out <- replicateM(replicateM(mkReg(0)));
-  // // Reg#(Vector#(output_lines, Vector#(output_lines, ElementType))) data_out <- mkReg(unpack('0));
-
-  // rule bind_cols;
-  //   Vector#(output_lines, Vector#(output_lines, Bit#(kernel_size_2_bits))) cols_ = unpack('0);
-  //   for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-  //     for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-  //       cols_[i][j] = {
-  //         pack(data_in[i][j]),
-  //         pack(data_in[i][j + 1]),
-  //         pack(data_in[i][j + 2]),
-  //         pack(data_in[i + 1][j]),
-  //         pack(data_in[i + 1][j + 1]),
-  //         pack(data_in[i + 1][j + 2]),
-  //         pack(data_in[i + 2][j]),
-  //         pack(data_in[i + 2][j + 1]),
-  //         pack(data_in[i + 2][j + 2])
-  //       };
-  //     end
-  //   end
-  //   cols <= cols_;
-  // endrule
-
-  // LayerData_ifc#(ElementType, kernel_size_2, output_channels) data <- mkLayerData("cnn", layer_name);
-  // Reg#(Bool) done <- mkReg(True);
-  // Reg#(out) tmp <- mkReg(unpack('0));
-
-  // rule start (done && fifo_in.notEmpty && data.weightsDone() && data.biasDone());
-  //   // $display("Layer %s start", layer_name);
-  //   data.weightsStart();
-  //   data.biasStart();
-  //   done <= False;
-  //   tmp <= unpack('0);
-  // endrule
-
-  // rule acc (!done && !data.weightsDone() && !data.biasDone());
-  //   let index = data.getWeightsIndex() - 1;
-  //   // $display("Layer %s acc weights, index=%x", layer_name, index);
-  //   let kernel <- data.getWeights();
-  //   let top = fifo_in.first;
-  //   out t = tmp;
-  //   let bias <- data.getBias();
-  //   for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-  //     for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-  //       ElementType s = 0;
-  //       Vector#(kernel_size_2, ElementType) col = unpack(cols[i][j]);
-  //       // for (Integer k = 0; k < valueOf(kernel_size_2); k = k + 1) begin
-  //       //   s = s + ((col[k] * kernel[k])>> q_bits());
-  //       // end
-  //       // s = ((col[0] * kernel[0])>> q_bits());
-  //       s = col[0] * kernel[0];
-  //       t[index][i][j] = s + bias;
-  //     end
-  //   end
-  //   tmp <= t;
-  // endrule
-
-  // rule set_done (!done && data.weightsDone() && data.biasDone());
-  //   // $display("Layer %s set done, tmp=%x", layer_name, pack(tmp));
-  //   done <= True;
-  //   fifo_out.enq(tmp);
-  //   fifo_in.deq;
-  //   tmp <= unpack('0);
-  // endrule
-
-  // Reg#(Vector#(output_channels, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementTmpType)))) 
-  //   tmp <- mkReg(unpack('0));
-  // Reg#(out) tmp <- mkReg(unpack('0));
-  Vector#(output_channels, Vector::Vector#(output_lines, Vector::Vector#(output_lines, Reg#(ElementType))))
-    tmp <- replicateM(replicateM(replicateM(mkRegU)));
-
-  // FIFO#(ConvReq#(Bit#(output_channels), Bit#(TLog#(output_lines_2)), Bit#(TLog#(output_lines_2)))) reqPipe <- mkFIFO;
-
-  Reg#(Bit#(output_channels)) c <- mkReg(unpack('0));
-  Reg#(Bit#(TLog#(output_lines_2))) i <- mkReg(unpack('0));
-  Reg#(Bit#(TLog#(output_lines_2))) j <- mkReg(unpack('0));
-  Reg#(Bit#(TLog#(TMul#(output_channels, kernel_size_2)))) xi <- mkReg(unpack('0));
-
-  // rule enq_requests;
-  rule handle;
-    let weights = cnn_conv1_weight();
-    let top = fifo_in.first;
-    Bit#(output_channels) nc = c;
-    Bit#(TLog#(output_lines_2)) ni = i;
-    Bit#(TLog#(output_lines_2)) nj = j;
-    Bit#(TLog#(TMul#(output_channels, kernel_size_2))) nxi = xi + 1;
-    Bool done = False;
-    if (nxi + 1 == fromInteger(valueOf(TMul#(output_channels, kernel_size_2)))) begin
-      nxi = pack('0);
-      nj = nj + 1;
-      if (nj + 1 == fromInteger(valueOf(output_lines))) begin
-        nj = pack('0);
-        ni = ni + 1;
-        if (ni + 1 == fromInteger(valueOf(output_lines))) begin
-          ni = pack('0);
-          nc = nc + 1;
-          if (nc + 1 == fromInteger(valueOf(output_channels))) begin
-            nc = pack('0);
-            done = True;
-          end
+  rule img2col if (col_i < fromInteger(valueOf(TMul#(output_size, output_channels))));
+    let next_col_i = col_i + 1;
+    let data_in = fifo_in.first;
+    Vector#(TMul#(kernel_size_2, input_channels), ElementType) col = unpack('0);
+    let x = col_i / fromInteger(valueOf(output_lines));
+    let y = col_i % fromInteger(valueOf(output_lines));
+    for (Integer channel = 0; channel < valueOf(input_channels); channel = channel + 1) begin
+      for (Integer i = 0; i < valueOf(kernel_size); i = i + 1) begin
+        for (Integer j = 0; j < valueOf(kernel_size); j = j + 1) begin
+          col[channel * valueOf(kernel_size_2) + i * valueOf(kernel_size) + j] = data_in[channel][fromInteger(i) + x][fromInteger(j) + y];
         end
       end
     end
-    if (!done) begin
-      ElementType xx = top[0][0][0];
-      Integer xx_cnt = 0;
-      Bool xx_selected = False;
-      for (Integer id = 0; id < valueOf(output_lines); id = id + 1) begin
-        for (Integer jd = 0; jd < valueOf(output_lines); jd = jd + 1) begin
-          if (!xx_selected && fromInteger(xx_cnt) == nxi) begin
-            xx = top[nc][ni + fromInteger(id)][nj + fromInteger(jd)];
-            xx_selected = True;
-          end
-        end
+    cols.enq(col);
+
+    col_i <= next_col_i;
+  endrule
+
+  // total: output_size
+  FIFO#(Vector#(TMul#(kernel_size_2, output_channels), ElementType)) col_mul_results <- mkFIFO;
+
+  let weights_data = cnn_conv1_weight();
+  let bias_data = cnn_conv1_bias();
+
+  rule calculate_mul_col;
+    let top = cols.first;
+    cols.deq;
+    Vector#(TMul#(kernel_size_2, output_channels), ElementType) col = unpack('0);
+    for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
+      let weights = weights_data[channel];
+      for (Integer i = 0; i < valueOf(kernel_size_2); i = i + 1) begin
+        col[channel * valueOf(kernel_size_2) + i] = elementTruncate(elementMult(top[i], weights[i]));
       end
-      ElementType ww = unpack(pack(weights[nc][nxi]));
-      // reqPipe.enq(tagged MulReq { c: nc, i: ni, j: nj, x: xx, y: ww });
+    end
+    col_mul_results.enq(col);
+  endrule
 
-      // let upd = tmp;
-      // upd[nc][ni][nj] = tmp[nc][ni][nj] + elementTruncate(elementMult(xx, ww));
-      // tmp <= upd;
+  // total: output_size
+  FIFO#(Vector#(output_channels, ElementType)) col_acc_results <- mkFIFO;
 
-      tmp[nc][ni][nj] <= tmp[nc][ni][nj] + elementTruncate(elementMult(xx, ww));
+  rule calculate_acc_col;
+    let top = col_mul_results.first;
+    col_mul_results.deq;
+    Vector#(output_channels, ElementType) sum = unpack('0);
+    for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
+      for (Integer i = 0; i < valueOf(kernel_size_2); i = i + 1) begin
+        sum[channel] = sum[channel] + top[channel * valueOf(kernel_size_2) + i];
+      end
+      sum[channel] = sum[channel] + bias_data[channel];
+    end
+    col_acc_results.enq(sum);
+  endrule
+
+  Reg#(out) tmp <- mkReg(unpack('0));
+
+  Reg#(Bit#(TLog#(output_size))) output_cnt <- mkReg(0);
+  rule cols_to_output;
+    let top = col_acc_results.first;
+    col_acc_results.deq;
+    let x = output_cnt / fromInteger(valueOf(output_lines));
+    let y = output_cnt % fromInteger(valueOf(output_lines));
+    out upd = tmp;
+    for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
+      upd[channel][x][y] = top[channel];
+    end
+    if (output_cnt == fromInteger(valueOf(output_size) - 1)) begin
+      output_cnt <= 0;
+      tmp <= unpack('0);
+      fifo_out.enq(upd);
     end
     else begin
-      // reqPipe.enq(tagged FinishReq);
-      // fifo_out.enq(tmp);
-
-      out o = unpack('0);
-      // o = unpack(pack(tmp));
-      for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
-        for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
-          for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
-            o[channel][ii][jj] = tmp[channel][ii][jj];
-          end
-        end
-      end
-      fifo_out.enq(o);
-
-      fifo_in.deq;
+      output_cnt <= output_cnt + 1;
+      tmp <= upd;
     end
   endrule
 
-  // rule apply_requests;
-  //   let req = reqPipe.first;
-  //   reqPipe.deq;
-  //   let upd = tmp;
-  //   if (req matches tagged MulReq .mul_req) begin
-  //     let mul_raw = elementMult(mul_req.x, mul_req.y);
-  //     // upd[mul_req.c][mul_req.i][mul_req.j] = tmp[mul_req.c][mul_req.i][mul_req.j] + mul_raw;
-  //     upd[mul_req.c][mul_req.i][mul_req.j] = tmp[mul_req.c][mul_req.i][mul_req.j] + elementTruncate(mul_raw);
-  //   end
-  //   else if (req matches tagged FinishReq) begin
-  //     // out o = unpack('0);
-  //     // for (Integer c = 0; c < valueOf(output_channels); c = c + 1) begin
-  //     //   for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
-  //     //     for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
-  //     //       o[c][i][j] = elementTruncate(upd[c][i][j]);
-  //     //     end
-  //     //   end
-  //     // end
-  //     let o = tmp;
-  //     fifo_out.enq(o);
-  //     fifo_in.deq;
-  //   end
-  //   tmp <= upd;
-  // endrule
-
-  let bias_data = cnn_conv1_bias();
-  // out tmp_init = unpack('0);
-  // for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
-  //   for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
-  //     for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
-  //       // t[channel][ii][jj] = elementExtend(unpack(pack(bias_data[channel])));
-  //       tmp_init[channel][ii][jj] = unpack(pack(bias_data[channel]));
-  //     end
-  //   end
-  // end
-
   method Action put(in x);
-    // Vector#(output_channels, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementTmpType))) t = unpack('0);
-    // out t = unpack('0);
-    // for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
-    //   for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
-    //     for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
-    //       // t[channel][ii][jj] = elementExtend(unpack(pack(bias_data[channel])));
-    //       t[channel][ii][jj] = unpack(pack(bias_data[channel]));
-    //     end
-    //   end
-    // end
-    // tmp <= t;
+    fifo_in.enq(x);
+  endmethod
 
-    // tmp <= tmp_init;
+  method ActionValue#(out) get;
+    out y = fifo_out.first;
+    fifo_out.deq;
+    return y;
+  endmethod
 
-    for (Integer channel = 0; channel < valueOf(output_channels); channel = channel + 1) begin
-      for (Integer ii = 0; ii < valueOf(output_lines); ii = ii + 1) begin
-        for (Integer jj = 0; jj < valueOf(output_lines); jj = jj + 1) begin
-          tmp[channel][ii][jj] <= unpack(pack(bias_data[channel]));
+endmodule
+
+module mkMaxPoolingLayer(Layer#(in, out))
+  provisos (
+    Bits#(in, input_bits),
+    Bits#(out, output_bits),
+    Mul#(TMul#(output_size, SizeOf#(ElementType)), output_channels, output_bits),
+    Mul#(TMul#(input_size, SizeOf#(ElementType)), input_channels, input_bits),
+    Mul#(input_lines, input_lines, input_size),
+    Mul#(output_lines, output_lines, output_size),
+    // decrese size by scale (2)
+    Mul#(output_lines, scale, input_lines),
+    // same channels
+    Add#(input_channels, 0, output_channels),
+    // 3D vectors required
+    PrimSelectable#(in, Vector::Vector#(input_lines, Vector::Vector#(input_lines, ElementType))),
+    PrimSelectable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementType))),
+    PrimUpdateable#(out, Vector::Vector#(output_lines, Vector::Vector#(output_lines, ElementType)))
+  );
+
+  FIFOF#(in) fifo_in <- mkFIFOF;
+  FIFOF#(out) fifo_out <- mkFIFOF;
+
+  rule handle;
+    out o = unpack('0);
+    let top = fifo_in.first;
+    fifo_in.deq;
+
+    for (Integer channel = 0; channel < valueOf(input_channels); channel = channel + 1) begin
+      for (Integer i = 0; i < valueOf(output_lines); i = i + 1) begin
+        for (Integer j = 0; j < valueOf(output_lines); j = j + 1) begin
+          let x = i * valueOf(scale);
+          let y = j * valueOf(scale);
+          ElementType max = top[channel][x][y];
+          for (Integer k = 0; k < valueOf(scale); k = k + 1) begin
+            for (Integer l = 0; l < valueOf(scale); l = l + 1) begin
+              if (top[channel][x + k][y + l] > max) begin
+                max = top[channel][x + k][y + l];
+              end
+            end
+          end
+          o[channel][i][j] = max;
         end
       end
     end
 
+    fifo_out.enq(o);
+  endrule
+
+  method Action put(in x);
     fifo_in.enq(x);
   endmethod
 

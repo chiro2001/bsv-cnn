@@ -118,7 +118,7 @@ def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int =
   valid_bits = int(Q_TYPE[3:])
   name = model.name.lower()
   with open(GEN_PATH + name + ".bsv", "w") as f:
-    f.write(f"// generated file\npackage {name};\n\nimport Vector::*;\n\n")
+    f.write(f"// generated file\npackage {name};\n\nimport Vector::*;\nimport Config::*;\n\n")
     def get_layer_name(original: str) -> str:
       return (name + "_" + original).replace(".", "_").replace("-", "_")
     for key in model.state_dict():
@@ -140,20 +140,20 @@ def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int =
       
       if vector:
         if len(data.shape) == 1:
-          typ = f"Vector#({data.shape[0]}, Int#({valid_bits}))"
+          typ = f"Vector#({data.shape[0]}, ElementType"
           write_function_header(typ)
           for i in range(data.shape[0]):
             f.write(f"a[{i}]={data[i]};")
           f.write("\n")
         elif len(data.shape) == 2:
-          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Int#({valid_bits})))"
+          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, ElementType)"
           write_function_header(typ)
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
               f.write(f"a[{i}][{j}]={data[i][j]};")
             f.write("\n")
         elif len(data.shape) == 4:
-          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, Int#({valid_bits})))))"
+          typ = f"Vector#({data.shape[0]}, Vector#({data.shape[1]}, Vector#({data.shape[2]}, Vector#({data.shape[3]}, ElementType)))"
           write_function_header(typ)
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
@@ -163,18 +163,18 @@ def dump_bsv(model, vector: bool = False, conv_only: bool = True, max_dim: int =
               f.write("\n")
       else:
         if len(data.shape) == 1:
-          write_function_header(f"Int#({valid_bits}) a[{data.shape[0]}]", f"Int#({valid_bits})[]", "")
+          write_function_header(f"ElementType a[{data.shape[0]}]", f"ElementType[]", "")
           for i in range(data.shape[0]):
             f.write(f"a[{i}]={data[i]};")
           f.write("\n")
         elif len(data.shape) == 2:
-          write_function_header(f"Int#({valid_bits}) a[{data.shape[0]}][{data.shape[1]}]", f"Int#({valid_bits})[][]", "")
+          write_function_header(f"ElementType a[{data.shape[0]}][{data.shape[1]}]", f"ElementType[][]", "")
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
               f.write(f"a[{i}][{j}]={data[i][j]};")
             f.write("\n")
         elif len(data.shape) == 4:
-          write_function_header(f"Int#({valid_bits}) a[{data.shape[0]}][{data.shape[1]}][{data.shape[2]}][{data.shape[3]}]", f"Int#({valid_bits})[][][][]", "")
+          write_function_header(f"ElementType a[{data.shape[0]}][{data.shape[1]}][{data.shape[2]}][{data.shape[3]}]", f"ElementType[][][][]", "")
           for i in range(data.shape[0]):
             for j in range(data.shape[1]):
               for k in range(data.shape[2]):

@@ -33,3 +33,8 @@ function Vector#(m, td) flatten(Vector#(n1, Vector#(n2, td)) x)
     provisos (Mul#(n1, n2, m), Bits#(td, tdSz));
   return unpack(pack(x));
 endfunction
+
+function Vector#(m, td) flatten3(Vector#(n3, Vector#(n1, Vector#(n2, td))) x)
+    provisos (Mul#(TMul#(n1, n2), n3, m), Bits#(td, tdSz));
+  return unpack(pack(x));
+endfunction
